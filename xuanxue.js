@@ -7958,7 +7958,8 @@ async function runDashboard() {
   btn.classList.add('loading');
   if (scanBar) scanBar.style.display = 'flex';
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
-  document.getElementById('dbWelcome').style.display = 'none';
+  const _wEl = document.getElementById('dbWelcome');
+  if (_wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
   renderCoinList(); renderCoinTable();
 
@@ -7990,17 +7991,11 @@ async function runDashboard() {
     dashCoins.forEach(c => { dashResults[c.coin] = { coin:c.coin, label:dashCoins.find(x=>x.coin===c.coin)?.label||c.coin, color:'var(--gold)', error:'网络不可用，请点击手动输入价格' }; });
     renderCoinList(); renderCoinTable();
     try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
-    const notice = document.getElementById('dbWelcome');
-    if (notice) {
-      notice.style.display = 'flex';
-      notice.innerHTML = `
-        <div class="welcome-icon">📡</div>
-        <div class="welcome-title">网络连接不可用</div>
-        <div class="welcome-body" style="color:var(--muted)">
-          CF Worker 和公共代理均超时<br>
-          请使用左侧 <strong style="color:var(--gold)">⚡ 直接推演</strong> 手动输入价格进行分析
-        </div>`;
-    }
+    // Network fail: show inline notice in scan bar, not welcome overlay
+    const scanBarEl = document.getElementById('scanStatusBar');
+    const scanTxtEl = document.getElementById('scanStatusText');
+    if (scanBarEl) scanBarEl.style.display = 'flex';
+    if (scanTxtEl) scanTxtEl.innerHTML = '📡 网络不可用 · 点击左侧<strong style="color:var(--gold);margin:0 4px">⚡ 直接推演</strong>手动输入价格';
     return;
   }
   const sentPanel = document.getElementById('sentimentPanel');
@@ -8228,6 +8223,10 @@ async function runDashboard() {
     updateTfRecommendation();
     renderCoinTable();
     try { if (typeof renderCoinCards==='function') renderCoinCards(); } catch(_e) {}
+    // Force welcome hidden after full render
+    const _fw = document.getElementById('dbWelcome');
+    if (_fw) _fw.style.display = 'none';
+    if (scanBar) scanBar.style.display = 'none';
 
     // ── 历史模式：自动验证误差 ────────────────────────────────────────────
     // 获取"N天后"实际价格对比推演结果，自动记录到误差追踪器
@@ -11485,10 +11484,11 @@ function renderCoinTable() {
     return;
   }
   if (welcome) welcome.style.display = 'none';
-  // CSS handles table visibility by breakpoint (table hidden on mobile via !important).
-  // On desktop show table; on mobile CSS overrides this with display:none !important.
+  if (welcome) welcome.style.flex = '0';  // remove from flex flow so table fills space
+  // Desktop: show table and hide welcome
+  if (welcome) welcome.style.display = 'none';
   tblEl.style.display = 'table';
-  // Always sync card list too (CSS hides/shows by breakpoint)
+  // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
 
   const fmtP = v => {
@@ -13158,15 +13158,16 @@ function renderCoinCards() {
   const tblEl   = document.getElementById('coinTbl');
 
   if (!hasAny) {
-    listEl.innerHTML = '';   // empty → CSS :empty rule hides it
-    if (welcome) welcome.style.display = '';   // restore to CSS default
+    listEl.innerHTML = '';
+    listEl.style.display = 'none';
+    if (welcome) { welcome.style.display = ''; welcome.style.flex = '1'; }
     return;
   }
 
-  // Have data: hide welcome, show card list
-  if (welcome) welcome.style.display = 'none';
-  // Force card list visible (belt-and-suspenders alongside CSS)
-  if (listEl) listEl.style.display = 'block';
+  // Have data: hide welcome, FORCE card list visible
+  if (welcome) { welcome.style.display = 'none'; welcome.style.flex = '0'; }
+  listEl.style.setProperty('display','block','important');
+  listEl.style.padding = '8px 12px 90px';
 
   const fmtP = v => {
     if (v == null || isNaN(v)) return '--';
