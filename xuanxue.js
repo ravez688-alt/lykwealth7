@@ -7958,7 +7958,6 @@ async function runDashboard() {
   btn.classList.add('loading');
   if (scanBar) scanBar.style.display = 'flex';
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
-  const _wEl = document.getElementById('dbWelcome');
   if (_wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
   renderCoinList(); renderCoinTable();
@@ -8224,8 +8223,7 @@ async function runDashboard() {
     renderCoinTable();
     try { if (typeof renderCoinCards==='function') renderCoinCards(); } catch(_e) {}
     // Force welcome hidden after full render
-    const _fw = document.getElementById('dbWelcome');
-    if (_fw) _fw.classList.add('hidden');
+        
     if (scanBar) scanBar.style.display = 'none';
 
     // ── 历史模式：自动验证误差 ────────────────────────────────────────────
@@ -11375,8 +11373,7 @@ window.addEventListener('error', function(e) {
     btn.disabled = false;
   }
   // Show error in welcome area
-  const welcome = document.getElementById('dbWelcome');
-  if (welcome && !welcome.classList.contains('hidden')) {
+    if (welcome && !welcome.classList.contains('hidden')) {
     const errDiv = document.getElementById('_errNotice') || document.createElement('div');
     errDiv.id = '_errNotice';
     errDiv.style.cssText = 'margin:12px;padding:10px 14px;background:rgba(184,40,40,.1);border:1px solid rgba(184,40,40,.3);border-radius:8px;font-size:.72rem;color:#b82828;line-height:1.7';
@@ -11472,21 +11469,20 @@ function renderCoinTable() {
   updateDashStatCards();
   const tbody   = document.getElementById('coinTblBody');
   const tblEl   = document.getElementById('coinTbl');
-  const welcome = document.getElementById('dbWelcome');
-  if (!tbody || !tblEl) return;
+    if (!tbody || !tblEl) return;
 
   const hasAny = dashCoins.some(c => dashResults[c.coin] && dashResults[c.coin] !== 'loading');
   if (!hasAny) {
-    if (welcome) welcome.classList.remove('hidden');   // CSS default (flex)
+       // CSS default (flex)
     tblEl.style.display = 'none';
     const cardList = document.getElementById('coinCardList');
     if (cardList) cardList.innerHTML = '';     // empty → CSS :empty hides it
     return;
   }
-  if (welcome) welcome.classList.add('hidden');
-  if (welcome) welcome.style.flex = '0';  // remove from flex flow so table fills space
+  
+    // remove from flex flow so table fills space
   // Desktop: show table and hide welcome
-  if (welcome) welcome.classList.add('hidden');
+  
   tblEl.style.display = 'table';
   // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
@@ -13154,18 +13150,17 @@ function renderCoinCards() {
   // On mobile:  table#coinTbl is hidden by CSS, #coinCardList:empty hides when no data.
   // JS only manages welcome screen and writes innerHTML — no display toggling here.
 
-  const welcome = document.getElementById('dbWelcome');
-  const tblEl   = document.getElementById('coinTbl');
+    const tblEl   = document.getElementById('coinTbl');
 
   if (!hasAny) {
     listEl.innerHTML = '';
     listEl.style.display = 'none';
-    if (welcome) { welcome.classList.remove('hidden'); }
+    
     return;
   }
 
   // Have data: hide welcome, FORCE card list visible
-  if (welcome) { welcome.classList.add('hidden'); }
+  
   listEl.style.setProperty('display','block','important');
   listEl.style.padding = '8px 12px 90px';
 
