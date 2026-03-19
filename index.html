@@ -517,16 +517,22 @@ body {
 .table-wrap {
   flex: 1; overflow-y: auto; overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative; /* welcome positions absolute inside this */
 }
 .table-wrap::-webkit-scrollbar { width: 4px; height: 4px; }
 .table-wrap::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
 
 /* ── Welcome state ── */
 .welcome {
-  flex: 1; display: flex; flex-direction: column;
+  display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 12px; padding: 40px; text-align: center;
+  /* Absolute so it never pushes table out of flow */
+  position: absolute; inset: 0; z-index: 5;
+  background: var(--bg);
+  pointer-events: none;
 }
+.welcome.hidden { display: none !important; }
 .welcome-icon { font-size: 3.2rem; opacity: .2; }
 .welcome-title {
   font-size: 1.2rem; font-weight: 700; color: var(--text);
@@ -957,7 +963,11 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   table.coin-tbl, #coinTbl { display: none !important; }
 
   /* ALWAYS show card list (empty = hidden by :empty) */
-  #coinCardList { display: block !important; padding: 8px 12px 90px; }
+  #coinCardList {
+    display: block !important;
+    padding: 8px 12px 90px;
+    position: relative; z-index: 10;  /* above welcome overlay */
+  }
   #coinCardList:empty { display: none !important; }
 
   /* Detail: full screen */
@@ -1398,9 +1408,9 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
           <div class="welcome-icon">☯</div>
           <div class="welcome-title">天機數元</div>
           <div class="welcome-body">
-            <span class="spinner"></span> <strong style="color:var(--gold)">正在自动抓取行情…</strong><br>
-            系统自动推演十法合一分析<br>
-            <span style="font-size:.78rem;color:var(--faint)">网络受限时请使用左侧直接推演手动输入</span>
+            <strong style="color:var(--gold)">✦ 全部推演</strong> 开始<br>
+            系统自动抓取价格并运行十法合一推演<br>
+            推演完成后数据显示在此列表
           </div>
           <div class="welcome-hint">💡 网络受限？左侧「⚡ 直接推演」输入价格即可离线分析</div>
           <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
@@ -1595,7 +1605,7 @@ window.addEventListener('load', function() {
 
       // Hide welcome message immediately
       var welcome = document.getElementById('dbWelcome');
-      if (welcome) welcome.style.display = 'none';
+      if (welcome) { welcome.style.display = 'none'; welcome.style.flex = '0'; }
 
       // Try oneClick (full pipeline with smart learning)
       if (window.oneClick && typeof window.oneClick.runAll === 'function' && !window.oneClick.running) {
