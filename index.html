@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>天機數元 · 玄学推演系统</title>
+    
+    <!-- 你的原有CSS（稍作手机适配） -->
+    <link rel="stylesheet" href="./css/style.css">
+    
+    <!-- 手机专用调试（只在手机显示） -->
+    <script>
+        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            // 加载vConsole用于调试
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/vconsole@3.15.1/dist/vconsole.min.js';
+            script.onload = function() {
+                var vConsole = new VConsole();
+                console.log('📱 玄学系统手机调试模式');
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+</head>
+<body>
+    <div class="container" id="app">
+        <!-- ===== 顶部状态 ===== 保留你的原有布局 -->
+        <div class="status-bar">
+            <div class="fear-greed">恐惧贪婪 23 · 极度恐惧</div>
+            <div class="btc-fee">BTC费率 -0.4293% · 负费率</div>
+            <div class="update-time">更新 2026/03/19 08:41:44</div>
+        </div>
+        
+        <!-- ===== 四象卡片 ===== 你的上涨/下跌趋势等 -->
+        <div class="four-cards">
+            <div class="card" id="card-up">
+                <div class="card-label">上涨趋势</div>
+                <div class="card-number" id="upCount">0</div>
+                <div class="card-sub">看涨币种</div>
+            </div>
+            <div class="card" id="card-down">
+                <div class="card-label">下跌趋势</div>
+                <div class="card-number" id="downCount">0</div>
+                <div class="card-sub">看跌币种</div>
+            </div>
+            <div class="card" id="card-alert">
+                <div class="card-label">异动关注</div>
+                <div class="card-number" id="alertCount">0</div>
+                <div class="card-sub">信号异动</div>
+            </div>
+            <div class="card" id="card-opp">
+                <div class="card-label">发现机会</div>
+                <div class="card-number" id="oppCount">0</div>
+                <div class="card-sub">高分机会</div>
+            </div>
+        </div>
+        
+        <!-- ===== 信号阶段 ===== 你的全部/已入场等 -->
+        <div class="signal-phases">
+            <span class="phase active">全部</span>
+            <span class="phase">已入场</span>
+            <span class="phase">预备池</span>
+            <span class="phase">观察池</span>
+            <span class="phase">已出局</span>
+        </div>
+        
+        <!-- ===== 主标题 ===== 天機數元 -->
+        <h1 class="main-title">天機數元</h1>
+        
+        <!-- ===== 推演按钮 ===== 点击左侧全部推演 -->
+        <div class="yanji-container">
+            <div class="left-panel">
+                <div class="yanji-button" id="startYanji">
+                    <span class="symbol">✦</span>
+                    <span class="text">全部推演</span>
+                </div>
+            </div>
+            <div class="right-panel">
+                <!-- 右侧显示推演结果列表 -->
+                <div class="result-list" id="resultList">
+                    <div class="hint">点击左侧 ✦ 全部推演 开始</div>
+                    <div class="hint-small">系统自动抓取价格并运行十法合一推演</div>
+                    <div class="hint-small">推演完成后数据显示在此列表</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ===== 网络受限提示 ===== 你的原有提示 -->
+        <div class="network-hint">
+            💡 网络受限时点击列表中币种 → 手动输入价格 → 运行推演
+        </div>
+        
+        <!-- ===== 底部导航 ===== 仪表盘/误差校正/设置 -->
+        <div class="bottom-nav">
+            <div class="nav-item active">仪表盘</div>
+            <div class="nav-item">误差校正</div>
+            <div class="nav-item">设置</div>
+        </div>
+        
+        <!-- ===== 玄学参数区域 ===== 江恩/缠论/支阻/谐波 -->
+        <div class="xuanxue-section">
+            <h3>模型权重（自动优化）</h3>
+            <div class="weights">
+                <div class="weight-item">
+                    <span class="weight-name">江恩</span>
+                    <span class="weight-value" id="gannWeight">40%</span>
+                    <span class="weight-status">待积累</span>
+                </div>
+                <div class="weight-item">
+                    <span class="weight-name">缠论</span>
+                    <span class="weight-value" id="chanWeight">25%</span>
+                    <span class="weight-status">待积累</span>
+                </div>
+                <div class="weight-item">
+                    <span class="weight-name">支阻</span>
+                    <span class="weight-value" id="supportWeight">20%</span>
+                    <span class="weight-status">待积累</span>
+                </div>
+                <div class="weight-item">
+                    <span class="weight-name">谐波</span>
+                    <span class="weight-value" id="harmonicWeight">15%</span>
+                    <span class="weight-status">待积累</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ===== 历史回测区域 ===== -->
+        <div class="history-section">
+            <h3>📅 批量历史回测</h3>
+            <div class="history-controls">
+                <input type="date" id="startDate" placeholder="开始日期">
+                <input type="date" id="endDate" placeholder="结束日期">
+                <select id="backtestCoin">
+                    <option value="XAU">XAU 黄金</option>
+                    <option value="BTC">BTC 比特币</option>
+                    <option value="ETH">ETH 以太坊</option>
+                </select>
+                <button id="runBacktest">回测</button>
+            </div>
+            <div class="history-records" id="historyRecords">
+                0条记录 · 推演历史日期后自动积累
+            </div>
+        </div>
+    </div>
+    
+    <!-- ===== 加载所有JS ===== 保留你的原有逻辑，但用我重写的数据层 -->
+    <script src="./js/xuanxue.js"></script>  <!-- 你的玄学算法 -->
+    <script src="./js/data.js"></script>     <!-- 我的数据层 -->
+    <script src="./js/app.js"></script>       <!-- 你的主逻辑 -->
+</body>
+</html>
