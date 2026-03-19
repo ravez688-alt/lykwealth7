@@ -1407,28 +1407,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
       <!-- Table -->
       <div class="table-wrap" id="tableWrap">
-        <div class="welcome" id="dbWelcome">
-          <div class="welcome-icon">☯</div>
-          <div class="welcome-title">天機數元</div>
-          <div class="welcome-body">
-            <strong style="color:var(--gold)">✦ 全部推演</strong> 开始<br>
-            系统自动抓取价格并运行十法合一推演<br>
-            推演完成后数据显示在此列表
-          </div>
-          <div class="welcome-hint">💡 网络受限时点击列表中币种 → 手动输入价格 → 运行推演</div>
-          <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-            <div style="padding:10px 16px;background:var(--card2);border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--muted);text-align:center">
-              <div style="font-size:1.1rem;margin-bottom:4px">📅</div>
-              <div>选择<strong style="color:var(--gold)">基准日期</strong>自动获取</div>
-              <div>历史收盘价</div>
-            </div>
-            <div style="padding:10px 16px;background:var(--card2);border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--muted);text-align:center">
-              <div style="font-size:1.1rem;margin-bottom:4px">📈</div>
-              <div>推演后点击币种详情</div>
-              <div>使用<strong style="color:var(--bull)">回测盈亏</strong>功能</div>
-            </div>
-          </div>
-        </div>
+        
 
         <!-- Mobile card list (shown instead of table on small screens) -->
         <div id="coinCardList" class="coin-card-list" style="display:none"></div>
@@ -1605,10 +1584,6 @@ window.addEventListener('load', function() {
       var scanBar = document.getElementById('scanStatusBar');
       if (scanBar) scanBar.style.display = 'flex';
       if (scanTxt) scanTxt.textContent = '正在自动抓取行情…';
-
-      // Hide welcome immediately
-      var welcome = document.getElementById('dbWelcome');
-      if (welcome) welcome.classList.add('hidden');
 
       // Try oneClick (full pipeline with smart learning)
       if (window.oneClick && typeof window.oneClick.runAll === 'function' && !window.oneClick.running) {
