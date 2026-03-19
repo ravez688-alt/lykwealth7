@@ -996,6 +996,9 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   .modal-box { border-radius: 16px 16px 0 0; max-height: 90vh; }
   .modal-overlay { align-items: flex-end; padding: 0; }
 }
+
+/* Universal hide utility — overrides everything */
+.hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -1412,7 +1415,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
             系统自动抓取价格并运行十法合一推演<br>
             推演完成后数据显示在此列表
           </div>
-          <div class="welcome-hint">💡 网络受限？左侧「⚡ 直接推演」输入价格即可离线分析</div>
+          <div class="welcome-hint">💡 网络受限时点击列表中币种 → 手动输入价格 → 运行推演</div>
           <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
             <div style="padding:10px 16px;background:var(--card2);border:1px solid var(--border);border-radius:10px;font-size:.78rem;color:var(--muted);text-align:center">
               <div style="font-size:1.1rem;margin-bottom:4px">📅</div>
@@ -1601,11 +1604,11 @@ window.addEventListener('load', function() {
       var scanTxt = document.getElementById('scanStatusText');
       var scanBar = document.getElementById('scanStatusBar');
       if (scanBar) scanBar.style.display = 'flex';
-      if (scanTxt) scanTxt.textContent = '正在自动抓取行情，请稍候…';
+      if (scanTxt) scanTxt.textContent = '正在自动抓取行情…';
 
-      // Hide welcome message immediately
+      // Hide welcome immediately
       var welcome = document.getElementById('dbWelcome');
-      if (welcome) { welcome.style.display = 'none'; welcome.style.flex = '0'; }
+      if (welcome) welcome.classList.add('hidden');
 
       // Try oneClick (full pipeline with smart learning)
       if (window.oneClick && typeof window.oneClick.runAll === 'function' && !window.oneClick.running) {
