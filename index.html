@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>天機數元 · 十法合一</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -16,68 +16,7 @@
    Primary: Deep obsidian backgrounds, warm gold accents, crisp data
 ═══════════════════════════════════════════════════════════ */
 :root {
-  /* Surfaces */
-  --bg:       #0a0b0f;
-  --bg2:      #0f1017;
-  --card:     #13151e;
-  --card2:    #181a24;
-  --panel:    #1c1f2e;
-
-  /* Borders */
-  --border:   rgba(255,255,255,.07);
-  --border2:  rgba(255,255,255,.12);
-  --border3:  rgba(255,255,255,.18);
-
-  /* Text */
-  --text:     #e8e4d8;
-  --muted:    #7a7868;
-  --faint:    #44433c;
-
-  /* Brand gold */
-  --gold:     #c8961e;
-  --gold2:    #e0b040;
-  --gold3:    #f0c860;
-  --gold-bg:  rgba(200,150,30,.1);
-  --gold-bd:  rgba(200,150,30,.25);
-
-  /* Signal colors */
-  --bull:     #22c55e;
-  --bear:     #ef4444;
-  --bull-bg:  rgba(34,197,94,.1);
-  --bear-bg:  rgba(239,68,68,.1);
-  --bull-bd:  rgba(34,197,94,.25);
-  --bear-bd:  rgba(239,68,68,.25);
-
-  /* Semantic */
-  --amber:    #f59e0b;
-  --indigo:   #818cf8;
-  --teal:     #2dd4bf;
-  --purple:   #a78bfa;
-  --crimson:  #f43f5e;
-  --sky:      #38bdf8;
-  --emerald:  #34d399;
-  --rose:     #fb7185;
-
-  /* Layout */
-  --sidebar-w:    272px;
-  --topbar-h:     54px;
-  --r:            12px;
-  --r-sm:         8px;
-  --r-lg:         16px;
-
-  /* Typography */
-  --font-body:    'Noto Sans SC', sans-serif;
-  --font-mono:    'IBM Plex Mono', monospace;
-  --font-display: 'DM Serif Display', serif;
-
-  /* Shadows */
-  --shadow:   0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
-  --shadow2:  0 4px 24px rgba(0,0,0,.5), 0 12px 48px rgba(0,0,0,.4);
-  --glow-gold: 0 0 20px rgba(200,150,30,.15);
-}
-
-/* Light theme */
-[data-theme="light"] {
+  /* Light theme (default) */
   --bg:      #f5f3ee;
   --bg2:     #ece9e2;
   --card:    #faf8f4;
@@ -103,7 +42,63 @@
   --shadow:  0 1px 3px rgba(0,0,0,.1), 0 4px 16px rgba(0,0,0,.07);
   --shadow2: 0 4px 24px rgba(0,0,0,.15), 0 12px 48px rgba(0,0,0,.1);
   --glow-gold: 0 0 20px rgba(140,100,16,.12);
+
+  /* Layout & Typography */
+  /* Surfaces */
+  /* Borders */
+  /* Text */
+  /* Brand gold */
+  /* Signal colors */
+  /* Semantic */
+  /* Layout */
+  --sidebar-w:    272px;
+  --topbar-h:     54px;
+  --r:            12px;
+  --r-sm:         8px;
+  --r-lg:         16px;
+  /* Typography */
+  --font-body:    'Noto Sans SC', sans-serif;
+  --font-mono:    'IBM Plex Mono', monospace;
+  --font-display: 'DM Serif Display', serif;
+  /* Shadows */
 }
+
+[data-theme="dark"] {
+  --bg:       #0a0b0f;
+  --bg2:      #0f1017;
+  --card:     #13151e;
+  --card2:    #181a24;
+  --panel:    #1c1f2e;
+  --border:   rgba(255,255,255,.07);
+  --border2:  rgba(255,255,255,.12);
+  --border3:  rgba(255,255,255,.18);
+  --text:     #e8e4d8;
+  --muted:    #7a7868;
+  --faint:    #44433c;
+  --gold:     #c8961e;
+  --gold2:    #e0b040;
+  --gold3:    #f0c860;
+  --gold-bg:  rgba(200,150,30,.1);
+  --gold-bd:  rgba(200,150,30,.25);
+  --bull:     #22c55e;
+  --bear:     #ef4444;
+  --bull-bg:  rgba(34,197,94,.1);
+  --bear-bg:  rgba(239,68,68,.1);
+  --bull-bd:  rgba(34,197,94,.25);
+  --bear-bd:  rgba(239,68,68,.25);
+  --amber:    #f59e0b;
+  --indigo:   #818cf8;
+  --teal:     #2dd4bf;
+  --purple:   #a78bfa;
+  --crimson:  #f43f5e;
+  --sky:      #38bdf8;
+  --emerald:  #34d399;
+  --rose:     #fb7185;
+  --shadow:   0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  --shadow2:  0 4px 24px rgba(0,0,0,.5), 0 12px 48px rgba(0,0,0,.4);
+  --glow-gold: 0 0 20px rgba(200,150,30,.15);
+}
+
 
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -999,6 +994,30 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
 /* Universal hide utility — overrides everything */
 .hidden { display: none !important; }
+
+/* ── Light mode specific fixes ── */
+[data-theme="light"] table.coin-tbl thead {
+  background: var(--card);
+  border-bottom: 2px solid var(--border2);
+}
+[data-theme="light"] .stat-card {
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+[data-theme="light"] .sidebar {
+  box-shadow: 2px 0 12px rgba(0,0,0,.06);
+}
+[data-theme="light"] #oneClickBtn {
+  color: #fff;
+}
+[data-theme="light"] .run-btn {
+  color: #fff;
+}
+[data-theme="light"] .tc-stage.in {
+  background: #e8f8ee; color: #16a34a; border-color: #a8ddb8;
+}
+[data-theme="light"] .tc-stage.watch {
+  background: #fff8e0; color: #8c6410; border-color: #e8d080;
+}
 </style>
 </head>
 <body>
@@ -1410,7 +1429,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
         
 
         <!-- Mobile card list (shown instead of table on small screens) -->
-        <div id="coinCardList" class="coin-card-list" style="display:none"></div>
+        <div id="coinCardList" class="coin-card-list"></div>
 
         <table class="coin-tbl" id="coinTbl" style="display:none">
           <thead>
