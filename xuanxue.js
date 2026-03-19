@@ -1,6 +1,1785 @@
 // xuanxue.js — 天機數元 · UI逻辑 · 仪表盘 · 推演流程
-// 依赖 data.js (需先加载)
-// 由 index.html 通过 <script src="xuanxue.js"> 引入
+// 依赖 data.js（必须先加载）
+
+function renderAll(data) {
+  const { coin, date, price, high, low, span, sys,
+          qm, ic, ve, gn, hr, sr, ch, nt, zw, va,
+          rsiE, macdE, bbE, tdE, tfRec, mtfE,
+          tpsl, tpsl5, nodes,
+          breakLevel, gt, klines } = data;
+
+  // ── 空引擎保护：active 为空时 score 默认 50 ──────────────────────────
+  const _safeArr = arr => arr.filter(Boolean);
+
+  // ── COMPOSITE ── 分离"价格引擎"与"时间/周期引擎" ─────────────────────
+  // 价格引擎：江恩、谐波、支撑阻力、缠论、命盘（有明确价位输出）
+  const priceEngines = _safeArr([
+    sys.gann?gn:null, sys.harmonic?hr:null, sys.sr?sr:null,
+    sys.chan?ch:null, sys.natal?nt:null,
+  ]);
+
+  // 时间/周期引擎：紫微、奇门、易经、印度占星、波动率（专长时间/周期）
+  const timeEngines = _safeArr([
+    sys.ziwei&&zw?zw:null, sys.qimen?qm:null,
+    sys.iching?ic:null,    sys.vedic?ve:null,
+    sys.volRate&&va?va:null,
+  ]);
+
+  // 综合 active 列表（向后兼容：仍包含所有引擎）
+  const active = [...priceEngines, ...timeEngines];
+
+  // 价格方向：只由价格引擎决定
+  const priceAvgBias = priceEngines.length
+    ? priceEngines.reduce((s,e)=>s+(e.bias||0),0) / priceEngines.length
+    : 0;
+
+  // 时间信号：由时间引擎的 bias 贡献（权重低：仅作辅助参考）
+  const timeAvgBias = timeEngines.length
+    ? timeEngines.reduce((s,e)=>s+(e.bias||0),0) / timeEngines.length
+    : 0;
+
+  // 综合 avgBias：价格引擎 80% + 时间引擎 20%
+  const avgBias = priceEngines.length
+    ? priceAvgBias * 0.80 + timeAvgBias * 0.20
+    : timeAvgBias;
+
+  const avgConf = active.length
+    ? active.reduce((s,e)=>s+(e.conf||0),0)/active.length
+    : 0.5;
+
+  // 价格引擎目标价汇总（供综合目标价使用）
+  const priceTargets = {
+    gann:  gn  ? (gn.levels?.find(l=>l.isAbove)?.price  || null) : null,
+    chan:  ch  ? (ch.zsHigh || null)                               : null,
+    sr:    sr  ? (sr.res?.[0]?.price || null)                      : null,
+    harmonic: hr ? (hr.patterns?.[0]?.D || null)                   : null,
+    // 波动率修正系数（乘以当前价）
+    vaCorrection: va ? va.correction : 1,
+  };
+  // 最终综合目标价（价格引擎均值 × 波动率修正）
+  const rawTargets = [priceTargets.gann, priceTargets.chan, priceTargets.sr]
+    .filter(Boolean);
+  const finalTarget = rawTargets.length
+    ? Math.round(rawTargets.reduce((s,v)=>s+v,0) / rawTargets.length * (priceTargets.vaCorrection||1))
+    : null;
+
+  // 时间信号汇总（供显示使用）
+  const timeSummary = {
+    ziwei:  zw ? { goodTime: zw.goodTime, badTime: zw.badTime, wealthStar: zw.wealthStar } : null,
+    qimen:  qm ? { entryTime: qm.entryTime, exitTime: qm.exitTime, direction: qm.direction } : null,
+    iching: ic ? { trend: ic.trend, changeDay: ic.changeDay, hexagram: ic.hexagram } : null,
+    vedic:  ve ? { cycle: ve.cycle, energy: ve.energy, planet: ve.planet }           : null,
+  };
+
+  const score   = Math.round((avgBias+1)/2*100);
+
+  // Score ring
+  const scoreColor = score >= 65 ? 'var(--bull)' : score <= 35 ? 'var(--bear)' : 'var(--gold)';
+  setTimeout(()=>{
+    const el = document.getElementById('scoreCircle');
+    if(el) {
+      const circ2 = 389.6;
+      el.style.strokeDashoffset = circ2 - circ2*score/100;
+      // Update gradient color based on score
+      el.setAttribute('stroke', score>=65 ? 'var(--bull)' : score<=35 ? 'var(--bear)' : 'url(#sg)');
+    }
+  }, 200);
+
+  // Counter animation
+  let cur = 0;
+  const numEl = document.getElementById('scoreNum');
+  const iv = setInterval(() => {
+    cur = Math.min(cur + 2, score);
+    if (numEl) {
+      numEl.textContent = cur;
+      numEl.style.color = scoreColor;
+    }
+    if (cur >= score) clearInterval(iv);
+  }, 18);
+
+  // Hex & verdict
+  const hexIdx = Math.round((avgBias+1)/2*63);
+  document.getElementById('vHex').textContent = HEXAGRAMS[hexIdx][0];
+
+  const titles = ['天地否塞·空头格局','阴云密布·偏空观望','中性徘徊·静候天机','温和向上·伺机布局','天时地利·多头格局'];
+  const ti = score>=80?4:score>=60?3:score>=45?2:score>=30?1:0;
+  document.getElementById('vTitle').textContent = titles[ti];
+
+  const NC_this = NATAL_CHARTS[coin] || {};
+  const assetName = NC_this.name || coin;
+  const isCommodity = !!NC_this.commodity;
+  const charEnergy = NC_this.char_energy || '多系统联合分析';
+  const natalNote = sys.natal && nt ? (nt.jupReturn?'命盘木星回归共振・' : nt.satReturn?'命盘土星压力期・' : '命盘行星过境・') : '';
+  const bodies = [
+    natalNote + `七法合一推演${assetName}强烈看跌信号。${HEXAGRAMS[hexIdx][1]}卦偏空，缠论背驰叠加江恩时间角，谐波阻力压制。${isCommodity?'地缘/季节因素需关注，':''}建议严控仓位。`,
+    natalNote + `多系统研判${assetName}偏空倾向。印度占星土星影响明显，中枢下移，支撑岌岌可危。${isCommodity?'商品基本面待确认，':''}建议减仓等待。`,
+    natalNote + `${assetName}各系统信号拉锯，天机难明。${HEXAGRAMS[hexIdx][1]}卦暗示静观其变。命盘气质：${charEnergy}。建议轻仓观望，等待共振再行动。`,
+    natalNote + `多系统综合${assetName}偏多。${HEXAGRAMS[hexIdx][1]}卦开门叠加，江恩周期上行，缠论底背驰确认。${isCommodity?'季节性需求支撑，':''}适度布局。`,
+    natalNote + `七法合一强烈看涨${assetName}！命盘气质「${charEnergy}」激活，木星加持，谐波PRZ触底，缠论买点出现，支撑稳固。综合置信度${((avgConf||0)*100).toFixed(0)}%。`
+  ];
+  document.getElementById('vBody').textContent = bodies[ti];
+
+  // System score bars — 价格引擎显示偏向，时间引擎显示专属字段
+  const sysInfo = [
+    sys.qimen?{name:'奇门遁甲', bias:qm.bias, conf:qm.conf, color:'var(--gold)',
+      roleLabel: qm.direction==='多'?'入市↑':qm.direction==='空'?'出市↓':'观望', isTimeSys:true}:null,
+    sys.iching?{name:'易经卦象', bias:ic.bias, conf:ic.conf, color:'var(--crimson)',
+      roleLabel: ic.trend+(ic.changeDay?'·'+ic.changeDay+'日变':''), isTimeSys:true}:null,
+    sys.vedic?{name:'印度占星', bias:ve.bias, conf:ve.conf, color:'var(--indigo)',
+      roleLabel: ve.cycle+'·'+ve.energy+'能量', isTimeSys:true}:null,
+    sys.gann?{name:'江恩理论', bias:gn.bias, conf:gn.conf, color:'var(--emerald)', isTimeSys:false}:null,
+    sys.harmonic?{name:'谐波形态', bias:hr.bias, conf:hr.conf, color:'var(--teal)', isTimeSys:false}:null,
+    sys.sr?{name:'支撑阻力', bias:sr.bias, conf:sr.conf, color:'var(--amber)', isTimeSys:false}:null,
+    sys.chan?{name:'缠    论', bias:ch.bias, conf:ch.conf, color:'var(--rose)', isTimeSys:false}:null,
+    sys.natal&&nt?{name:'命盘共振', bias:nt.bias, conf:nt.conf, color:'#a060e0', isTimeSys:false}:null,
+    sys.ziwei&&zw?{name:'紫微斗数', bias:zw.bias, conf:zw.conf, color:'#9040d8',
+      roleLabel: (zw.goodTime||[]).join('/') || '查时', isTimeSys:true}:null,
+    sys.volRate&&va?{name:'波动率', bias:va.bias, conf:va.conf, color:'#d4a843',
+      roleLabel:'修正×'+(va.correction||1).toFixed(3), isTimeSys:false}:null,
+  ].filter(Boolean);
+
+  document.getElementById('sysBars').innerHTML = sysInfo.map(s => {
+    const pct = Math.round((s.bias+1)/2*100);
+    // 时间引擎：显示专属角色标签而非多空百分比
+    if (s.isTimeSys && s.roleLabel) {
+      return `<div class="sbar-row">
+        <span class="sbar-name" title="${s.name}">${s.name}</span>
+        <div class="sbar-track" style="flex:1;height:6px;background:rgba(0,0,0,0.08);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${s.color};opacity:0.6;border-radius:3px"></div>
+        </div>
+        <span style="font-size:.6rem;font-weight:700;color:${s.color};width:60px;text-align:right;flex-shrink:0;white-space:nowrap">${s.roleLabel}</span>
+      </div>`;
+    }
+    const isBull = s.bias > 0.12;
+    const isBear = s.bias < -0.12;
+    const dirLabel = isBull ? '看涨' : isBear ? '看跌' : '中性';
+    const dirColor = isBull ? 'var(--bull)' : isBear ? 'var(--bear)' : 'var(--muted)';
+    return `<div class="sbar-row">
+      <span class="sbar-name" title="${s.name}">${s.name}</span>
+      <div class="sbar-track">
+        <div class="sbar-fill" style="width:${pct}%;background:${isBull?'var(--bull)':isBear?'var(--bear)':'var(--gold)'}"></div>
+      </div>
+      <span style="font-size:.62rem;font-weight:700;color:${dirColor};width:26px;text-align:right;flex-shrink:0">${dirLabel}</span>
+    </div>`;
+  }).join('');
+
+  // ══════════════════════════════════════════════
+  // 极简每日研判卡（仿博主格式：4行核心结论）
+  // ══════════════════════════════════════════════
+  {
+    const bannerEl = document.getElementById('signalBanner');
+    const summaryEl = document.getElementById('quickSummary');
+
+    const fmtB = v => {
+      const n = Number(v);
+      if(isNaN(n)||!isFinite(n)||n===0) return '--';
+      return n>=1000 ? '$'+Math.round(n).toLocaleString() : n>=1 ? '$'+n.toFixed(2) : '$'+n.toFixed(4);
+    };
+
+    // ── 结构行 ──────────────────────────────────────────────
+    const structParts = [];
+    if(tpsl5?.signal==='LONG') structParts.push('多头结构延续');
+    else if(tpsl5?.signal==='SHORT') structParts.push('空头结构主导');
+    else structParts.push('区间震荡整理');
+
+    if(ch) {
+      if(ch.biDir==='up' && !ch.beichi) structParts.push('上升笔未完成');
+      else if(ch.biDir==='up' && ch.beichi) structParts.push('上升笔'+(ch.beichiType||'背驰'));
+      else if(ch.biDir==='down' && ch.beichi) structParts.push('下跌'+ch.beichiType+'待确认');
+      else if(ch.zsValid) structParts.push('中枢震荡');
+    }
+    if(gn) {
+      const gnDir = gn.bias>0.2?'江恩角线支撑偏多':gn.bias<-0.2?'江恩角线压制偏空':'江恩角线中性';
+      structParts.push(gnDir);
+    }
+
+    // ── 时间行 ──────────────────────────────────────────────
+    const timeParts = [];
+    // 最近2个未来节点
+    const futureNodes = nodes.filter(n => new Date(n.date) > new Date()).slice(0,3);
+    futureNodes.forEach(n => {
+      const d = new Date(n.date);
+      const label = (d.getMonth()+1)+'/'+d.getDate();
+      const diffD = Math.round((new Date(n.date)-Date.now())/86400000);
+      const urgency = diffD<=2 ? '⌛' : '';
+      timeParts.push(`${label}（+${n.offset}天）${n.type}${urgency}`);
+    });
+    // 奇门今日时辰
+    if(qm?.entryTime) timeParts.push('今日吉时 '+qm.entryTime.replace(/（.*）/,'').trim());
+
+    // ── 价格行 ──────────────────────────────────────────────
+    const priceParts = [];
+    const T = tpsl;
+    if(T) {
+      const tp1 = T.tpLevels?.[0];
+      const tp2 = T.tpLevels?.[1];
+      const sl1 = T.slLevels?.[0];
+      if(tp1) priceParts.push('阻力 '+fmtB(tp1.price)+(tp2?' / '+fmtB(tp2.price):''));
+      if(sl1) priceParts.push('止损 '+fmtB(sl1.price));
+    }
+    // SR engine key zones
+    if(sr?.resZones?.length) {
+      const rz = sr.resZones[0];
+      const rzStr = fmtB(rz.high||rz.price||rz.low);
+      if(!priceParts[0]?.includes(rzStr)) priceParts.push('压力带 '+rzStr);
+    }
+    if(sr?.supZones?.length) {
+      const sz = sr.supZones[0];
+      const szStr = fmtB(sz.low||sz.price||sz.high);
+      priceParts.push('支撑带 '+szStr);
+    }
+    // TP5 target
+    if(tpsl5?.strategies?.length) {
+      const st5 = tpsl5.strategies[4];
+      priceParts.push('目标 '+fmtB(st5.long.tp));
+    }
+
+    // ── 操作行 ──────────────────────────────────────────────
+    const opParts = [];
+    const sig = tpsl?.signal || 'NEUTRAL';
+    const sl1price = tpsl?.slLevels?.[0]?.price;
+    const tp1price = tpsl?.tpLevels?.[0]?.price;
+
+    if(sig==='LONG') {
+      if(sl1price) opParts.push(`不破 ${fmtB(sl1price)} 偏多`);
+      else opParts.push('偏多布局');
+      if(ch?.beichi && ch.beichiType==='顶背驰') opParts.push('顶背驰信号需谨慎');
+      const nextKeyNode = futureNodes[0];
+      if(nextKeyNode) {
+        const nd = new Date(nextKeyNode.date);
+        opParts.push(`等 ${(nd.getMonth()+1)}/${nd.getDate()} 节点确认`+(nextKeyNode.isBull?'':'后考虑回调'));
+      }
+    } else if(sig==='SHORT') {
+      if(sl1price) opParts.push(`不破 ${fmtB(sl1price)} 偏空`);
+      if(tp1price) opParts.push(`目标 ${fmtB(tp1price)}`);
+    } else {
+      opParts.push('方向未明 轻仓观望');
+      if(sl1price) opParts.push(`关注 ${fmtB(sl1price)} 能否守住`);
+    }
+    const confPct = Math.round((avgConf||0.5)*100);
+
+    // ── 渲染研判卡 ──────────────────────────────────────────
+    const sigColor = sig==='LONG'?'var(--bull)':sig==='SHORT'?'var(--bear)':'var(--gold)';
+    const sigTxt   = sig==='LONG'?'▲ 偏多':sig==='SHORT'?'▼ 偏空':'◆ 观望';
+    const cardBorder = sig==='LONG'?'rgba(20,120,62,.35)':sig==='SHORT'?'rgba(168,32,32,.35)':'rgba(140,100,16,.35)';
+    const cardBg     = sig==='LONG'?'rgba(20,120,62,.04)':sig==='SHORT'?'rgba(168,32,32,.04)':'rgba(140,100,16,.03)';
+
+    if(bannerEl) bannerEl.style.display = 'none'; // 隐藏原banner
+
+    if(summaryEl) summaryEl.innerHTML = `
+      <div style="border:1px solid ${cardBorder};background:${cardBg};border-radius:12px;padding:14px 16px;margin:0 0 12px;font-size:.82rem;line-height:1">
+
+        <!-- 标题行 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:.68rem;font-weight:700;color:var(--faint);letter-spacing:.08em;text-transform:uppercase">${coin} · ${date} 研判</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:.78rem;font-weight:800;color:${sigColor};background:${sigColor}18;padding:3px 12px;border-radius:99px;border:1px solid ${sigColor}40">${sigTxt}</span>
+            <span style="font-size:.68rem;color:var(--faint)">${confPct}% 置信</span>
+          </div>
+        </div>
+
+        <!-- 4行内容 -->
+        <div style="display:flex;flex-direction:column;gap:9px">
+
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <span style="font-size:.72rem;font-weight:700;color:var(--sky);width:36px;flex-shrink:0;padding-top:1px">结构</span>
+            <span style="color:var(--text);flex:1;line-height:1.6">${structParts.join(' · ') || '--'}</span>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <span style="font-size:.72rem;font-weight:700;color:var(--gold);width:36px;flex-shrink:0;padding-top:1px">时间</span>
+            <span style="color:var(--text);flex:1;line-height:1.6">${timeParts.length ? timeParts.join('  ') : '暂无关键时间节点'}</span>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <span style="font-size:.72rem;font-weight:700;color:var(--amber);width:36px;flex-shrink:0;padding-top:1px">价格</span>
+            <span style="color:var(--text);flex:1;line-height:1.6">${priceParts.join('  ') || '--'}</span>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:flex-start;padding-top:9px;border-top:1px solid ${cardBorder}">
+            <span style="font-size:.72rem;font-weight:700;color:${sigColor};width:36px;flex-shrink:0;padding-top:1px">操作</span>
+            <span style="color:var(--text);flex:1;font-weight:600;line-height:1.6">${opParts.join(' → ')}</span>
+          </div>
+
+        </div>
+      </div>`;
+  }
+
+  // ── TABS ──
+  const tabDefs = [];
+  if(Object.values(sys).filter(Boolean).length>0) tabDefs.push({id:'overview',label:'📊 综合节点'});
+  tabDefs.push({id:'intraday', label:'⏰ 盘中时刻'});
+  tabDefs.push({id:'deduction', label:'🧭 缠·恩推演'});
+  tabDefs.push({id:'logic', label:'🔍 推算依据'});
+  tabDefs.push({id:'multicoin', label:'🔀 多币对比'});
+  if(sys.qimen)   tabDefs.push({id:'qimen',   label:'☲ 奇门遁甲'});
+  if(sys.iching)  tabDefs.push({id:'iching',  label:'䷀ 易经卦象'});
+  if(sys.vedic)   tabDefs.push({id:'vedic',   label:'✦ 印度占星'});
+  if(sys.gann)    tabDefs.push({id:'gann',    label:'⬡ 江恩理论'});
+  if(sys.harmonic)tabDefs.push({id:'harmonic',label:'◈ 谐波形态'});
+  if(sys.sr)      tabDefs.push({id:'sr',      label:'▤ 支撑阻力'});
+  if(sys.chan)    tabDefs.push({id:'chan',     label:'∿ 缠    论'});
+  if(sys.gann && sys.chan) tabDefs.push({id:'gannChanSynergy', label:'🔥 江恩×缠论'});
+  if(sys.ziwei)   tabDefs.push({id:'ziwei',   label:'☽ 紫微斗数'});
+  if(sys.volRate) tabDefs.push({id:'volrate', label:'⚙ 波动率'});
+  tabDefs.push({id:'techind', label:'📐 技术指标'});
+  tabDefs.push({id:'tpsl', label:'🎯 止盈止损'});
+  tabDefs.push({id:'backtest', label:'🔬 回测验证'});
+  if(sys.natal)   tabDefs.push({id:'natal',   label:'☽ 命盘共振'});
+
+  document.getElementById('tabBar').innerHTML = tabDefs.map((t,i)=>
+    `<button class="tab${i===0?' active':''}" onclick="switchDetailTab('${t.id}',this)">${t.label}</button>`
+  ).join('');
+
+  // Build tab panels
+  const panels = {};
+
+  // Overview / Timeline
+  const tagMap = {qimen:'t-qm',iching:'t-ic',vedic:'t-ve',gann:'t-gn',harmonic:'t-hr',sr:'t-sr',chan:'t-ch',natal:'t-nt'};
+  const tagLabel={qimen:'奇门',iching:'易经',vedic:'印度占星',gann:'江恩',harmonic:'谐波',sr:'支阻',chan:'缠论',natal:'命盘'};
+  panels['overview'] = `
+    <div class="panel">
+      <div class="panel-title">⏰ 重要节点预测时间线</div>
+
+      <!-- 价格路径预测图 -->
+      ${(()=>{
+        const P0 = price || 50000;
+        const totalDays = span || 90;
+        const overallBull = tpsl ? tpsl.signal !== 'SHORT' : true;
+        const chartBullTarget = (gt && gt.AR) ? gt.AR : P0 * 1.15;
+        const chartBearTarget = (gt && gt.AB) ? gt.AB : (high && low) ? smartRound(low - (high - low) * 0.382) : P0 * 0.85;
+        const endTarget = overallBull ? chartBullTarget : chartBearTarget;
+        const fmtPx = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():'$'+_n.toFixed(2); };
+
+        const pts = [{day:0, price:P0, label:'当前', isBull:true, conf:1, isCurrent:true}];
+        nodes.forEach(n => {
+          const frac = Math.min(n.offset / totalDays, 1);
+          const projP = smartRound(P0 + (endTarget - P0) * frac);
+          pts.push({day:n.offset, price:projP, label:n.type, isBull:n.isBull, conf:n.conf, activeSys:n.activeSys});
+        });
+        pts.push({day:totalDays, price:Math.round(endTarget), label:'目标', isBull:endTarget>=P0, conf:0.8, isFinal:true});
+
+        const W = 560, H = 160, PL = 54, PR = 16, PT = 20, PB = 28;
+        const cW = W - PL - PR, cH = H - PT - PB;
+        const allPrices = pts.map(p=>p.price);
+        const minP = Math.min(...allPrices) * 0.988;
+        const maxP = Math.max(...allPrices) * 1.012;
+        const cx = d => PL + (d / totalDays) * cW;
+        const cy = p => PT + cH - ((p - minP) / (maxP - minP)) * cH;
+
+        const pathPts = pts.map(p => [cx(p.day), cy(p.price)]);
+        let pathD = 'M ' + pathPts[0][0] + ',' + pathPts[0][1];
+        for(let i = 1; i < pathPts.length; i++) {
+          const prev = pathPts[i-1], cur = pathPts[i];
+          const cpx = (prev[0] + cur[0]) / 2;
+          pathD += ' C ' + cpx + ',' + prev[1] + ' ' + cpx + ',' + cur[1] + ' ' + cur[0] + ',' + cur[1];
+        }
+        const fillD = pathD + ' L ' + pathPts[pathPts.length-1][0] + ',' + (PT+cH) + ' L ' + PL + ',' + (PT+cH) + ' Z';
+
+        const gridPrices = [minP, (minP+maxP)/2, maxP].map(p => ({ price:p, y:cy(p), label:fmtPx(p) }));
+        const dots = pts.map(p => {
+          const x=cx(p.day),y=cy(p.price);
+          const col = p.isCurrent?'#c8a840':p.isFinal?'#c8a840':p.isBull?'#28c870':'#e05050';
+          const r = p.isCurrent||p.isFinal ? 5 : (p.conf>0.72?4.5:3.5);
+          const ring = (p.activeSys?.length>=3) ? '<circle cx="'+x+'" cy="'+y+'" r="'+(r+3)+'" fill="none" stroke="'+col+'" stroke-width="1" opacity="0.4"/>' : '';
+          return ring+'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+col+'" stroke="var(--bg)" stroke-width="1.5"/>';
+        }).join('');
+        const axisLabels = [0,Math.round(totalDays*0.25),Math.round(totalDays*0.5),Math.round(totalDays*0.75),totalDays]
+          .map(d=>'<text x="'+cx(d)+'" y="'+(PT+cH+14)+'" text-anchor="middle" font-size="8" fill="rgba(180,160,120,0.7)">+'+d+'天</text>').join('');
+
+        return '<div style="margin-bottom:14px;background:rgba(0,0,0,0.08);border:1px solid rgba(200,168,74,0.15);border-radius:10px;padding:8px 6px 6px;overflow:hidden">'
+          +'<div style="font-size:.6rem;color:rgba(200,168,74,.6);letter-spacing:.08em;margin-bottom:5px;padding:0 6px">📈 价格路径预测（'+totalDays+'天）</div>'
+          +'<svg width="100%" viewBox="0 0 '+W+' '+H+'" style="display:block">'
+          +'<defs><linearGradient id="pgFill2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(200,168,74,0.15)"/><stop offset="100%" stop-color="rgba(200,168,74,0)"/></linearGradient></defs>'
+          +gridPrices.map(g=>'<line x1="'+PL+'" y1="'+g.y+'" x2="'+(W-PR)+'" y2="'+g.y+'" stroke="rgba(200,168,74,0.07)" stroke-width="1"/>'
+            +'<text x="'+(PL-4)+'" y="'+(g.y+3)+'" text-anchor="end" font-size="7.5" fill="rgba(180,160,120,0.55)">'+g.label+'</text>').join('')
+          +'<path d="'+fillD+'" fill="url(#pgFill2)"/>'
+          +'<path d="'+pathD+'" fill="none" stroke="rgba(200,168,74,0.65)" stroke-width="1.8"/>'
+          +'<line x1="'+cx(0)+'" y1="'+PT+'" x2="'+cx(0)+'" y2="'+(PT+cH)+'" stroke="rgba(200,168,74,0.3)" stroke-width="1" stroke-dasharray="3,3"/>'
+          +dots+axisLabels
+          +'<text x="'+cx(0)+'" y="'+(cy(P0)-7)+'" text-anchor="middle" font-size="8" fill="#c8a840" font-weight="700">'+fmtPx(P0)+'</text>'
+          +'<text x="'+cx(totalDays)+'" y="'+(cy(Math.round(endTarget))-7)+'" text-anchor="middle" font-size="8" fill="#c8a840" font-weight="700">'+fmtPx(Math.round(endTarget))+'</text>'
+          +'</svg></div>';
+      })()}
+
+      <!-- 极简节点列表 -->
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${nodes.map((n,ni)=>{
+          const nodeDate = new Date(n.date);
+          const diffMs   = nodeDate - Date.now();
+          const diffD    = Math.round(diffMs/86400000);
+          const isPast   = diffMs < 0;
+          const isUrgent = !isPast && diffD <= 2;
+          const d = nodeDate;
+          const dateLabel = (d.getMonth()+1)+'/'+(d.getDate());
+          const cdStr = isPast ? '已过' : diffD===0 ? '今日 ⌛' : diffD<=2 ? diffD+'天 ⌛' : '+'+diffD+'天';
+          const cdColor = isPast?'var(--faint)':isUrgent?'var(--bull)':'var(--gold)';
+          const dirColor = n.isBull?'var(--bull)':'var(--bear)';
+          const dirIcon  = n.isBull?'▲':'▼';
+          const confPct  = Math.round((n.conf||0.5)*100);
+          const resonN   = n.activeSys?.length||0;
+          const resonDots= '●'.repeat(Math.min(resonN,5))+'○'.repeat(Math.max(0,5-Math.min(resonN,5)));
+          const rowOpacity = isPast ? 'opacity:.45;' : '';
+
+          // 预测价（同原逻辑）
+          const P0 = price||50000, totalDays=span||90;
+          const overallBull2 = tpsl?tpsl.signal!=='SHORT':true;
+          const endTarget2 = overallBull2?((gt&&gt.AR)?gt.AR:P0*1.15):((gt&&gt.AB)?gt.AB:P0*0.85);
+          const projP = smartRound(P0 + (endTarget2-P0)*Math.min(n.offset/totalDays,1));
+          const fmtPx2 = v=>{ const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():'$'+_n.toFixed(2); };
+
+          // 精简 details (最多2项)
+          const detailShort = (n.details||'').split(' · ').slice(0,2).join(' · ');
+
+          return `<div style="${rowOpacity}display:flex;align-items:center;gap:10px;padding:9px 12px;
+            border:1px solid ${isUrgent?'rgba(20,120,62,.35)':isPast?'var(--border)':'rgba(140,100,16,.2)'};
+            background:${isUrgent?'rgba(20,120,62,.04)':isPast?'transparent':'rgba(140,100,16,.02)'};
+            border-radius:9px;cursor:default">
+
+            <!-- 日期 -->
+            <div style="flex-shrink:0;text-align:center;width:44px">
+              <div style="font-size:.82rem;font-weight:800;color:${cdColor};font-family:monospace">${dateLabel}</div>
+              <div style="font-size:.58rem;color:${cdColor};margin-top:1px">${cdStr}</div>
+            </div>
+
+            <!-- 内容 -->
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                <span style="font-size:.78rem;font-weight:700;color:${dirColor}">${dirIcon} ${n.type||'节点'}</span>
+                ${n.mag?`<span style="font-size:.6rem;color:var(--faint)">${n.mag}</span>`:''}
+              </div>
+              <div style="font-size:.65rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${detailShort}</div>
+            </div>
+
+            <!-- 右侧数字 -->
+            <div style="flex-shrink:0;text-align:right">
+              <div style="font-size:.75rem;font-weight:700;color:var(--gold);font-family:monospace">${fmtPx2(projP)}</div>
+              <div style="font-size:.58rem;color:var(--faint);margin-top:2px">${confPct}% · <span style="letter-spacing:-1px;font-size:.6rem;color:${resonN>=3?'var(--gold)':'var(--faint)'}">${resonDots}</span></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+
+  // ── INTRADAY TIME PANEL ──────────────────────────────────────────────────
+  {
+    // Collect all time signals from all nodes
+    const allTimes = nodes.filter(n => n.timeInfo).map(n => ({
+      ...n.timeInfo,
+      date: n.date,
+      offset: n.offset,
+      isBull: n.isBull,
+      mag: n.mag,
+      type: n.type,
+      nodeConf: n.conf,
+      activeSys: n.activeSys,
+    }));
+
+    // Also generate system-specific intraday signals directly
+    const sysTimeSigs = [];
+
+    if(sys.qimen && qm) {
+      QIMEN_HOURS.forEach((qt, i) => {
+        const isBull = qm.bias > 0;
+        sysTimeSigs.push({ time: qt.h, window: `2小时时辰`, label: `奇门${qt.t}`, note: qt.note,
+          source: '奇门遁甲', isBull, conf: 0.55 + Math.abs(qm.bias)*0.2,
+          detail: `${qt.t}·宫位${i+1}·${qm.door}应期` });
+      });
+    }
+
+    if(sys.vedic && ve) {
+      Object.entries(VEDIC_PLANET_HOURS).forEach(([pl, vh]) => {
+        const isBull = ['木星','金星','月亮','太阳'].includes(pl);
+        sysTimeSigs.push({ time: vh.peak, window: vh.window, label: `${pl}时`, note: vh.note,
+          source: '印度占星', isBull, conf: 0.60 + Math.abs(ve.bias)*0.15, detail: vh.note });
+      });
+    }
+
+    if(sys.gann && gn) {
+      [90,120,144,180,240,270,360].forEach(ang => {
+        const h = Math.floor((ang % 360) / 15);
+        const t = `${String(h).padStart(2,'0')}:00`;
+        sysTimeSigs.push({ time: t, window: `±30分钟`, label: `江恩${ang}°`, note: `角度线${ang}°映射时刻`,
+          source: '江恩理论', isBull: gn.bias > 0, conf: 0.58, detail: `江恩${ang}°时间角→UTC+8 ${t}` });
+      });
+    }
+
+    if(sys.chan && ch) {
+      CHAN_TIMES.forEach(ct => {
+        sysTimeSigs.push({ time: ct.h, window: `±15分钟`, label: '缠论窗口', note: ct.note,
+          source: '缠　论', isBull: ch.biDir === 'up', conf: 0.55, detail: ct.note });
+      });
+    }
+
+    if(sys.harmonic && hr) {
+      HARMONIC_WINDOWS.forEach(hw => {
+        const [hs] = hw.split('-');
+        sysTimeSigs.push({ time: hs, window: hw, label: '谐波PRZ窗口', note: '流动性峰值·PRZ完成触达',
+          source: '谐波形态', isBull: hr.bias > 0, conf: 0.52, detail: `谐波PRZ触达窗口：${hw}` });
+      });
+    }
+
+    // Deduplicate and sort by time
+    const allSorted = [...allTimes, ...sysTimeSigs]
+      .sort((a, b) => a.time.localeCompare(b.time));
+
+    // Group by hour
+    const byHour = {};
+    allSorted.forEach(s => {
+      const hh = s.time.substring(0,2);
+      if (!byHour[hh]) byHour[hh] = [];
+      byHour[hh].push(s);
+    });
+
+    // Find peak hours (most signals)
+    const hourCounts = Object.entries(byHour).map(([h, sigs]) => ({
+      h, count: sigs.length, maxConf: Math.max(...sigs.map(s => s.conf||0.5))
+    })).sort((a,b) => b.count - a.count || b.maxConf - a.maxConf);
+    const topHours = hourCounts.slice(0, 3).map(x => x.h);
+
+    // Render 24h grid
+    const hourRows = Object.entries(byHour).map(([hh, sigs]) => {
+      const isTop = topHours.includes(hh);
+      const bullSigs = sigs.filter(s => s.isBull);
+      const bearSigs = sigs.filter(s => !s.isBull);
+      const dominantBull = bullSigs.length >= bearSigs.length;
+      const maxConf = Math.max(...sigs.map(s => s.conf||0.5));
+
+      return `<div style="border-radius:8px;margin-bottom:6px;overflow:hidden;border:1px solid ${isTop?'rgba(200,168,74,0.4)':'var(--border)'}">
+        <div style="display:flex;align-items:center;padding:8px 12px;background:${isTop?'rgba(200,168,74,0.1)':'var(--card2)'};gap:10px">
+          <div style="font-family:Cinzel,serif;font-size:1.1rem;font-weight:700;color:${isTop?'var(--gold)':'var(--text)'};min-width:52px">${hh}:xx</div>
+          <div style="flex:1">
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              ${sigs.map(s => `<span style="font-size:.62rem;padding:2px 7px;border-radius:99px;background:${s.isBull?'rgba(24,145,80,0.12)':'rgba(192,48,48,0.12)'};color:${s.isBull?'var(--bull)':'var(--bear)'};border:1px solid ${s.isBull?'rgba(24,145,80,0.25)':'rgba(192,48,48,0.25)'}">${s.source||s.label}</span>`).join('')}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:.8rem;font-weight:700;color:${dominantBull?'var(--bull)':'var(--bear)'}">${dominantBull?'▲ 偏多':'▼ 偏空'}</div>
+            <div style="font-size:.62rem;color:var(--faint)">${((maxConf||0)*100).toFixed(0)}% 置信</div>
+          </div>
+        </div>
+        <div style="padding:6px 12px 8px;background:var(--card)">
+          ${sigs.slice(0,3).map(s =>
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(0,0,0,0.04);font-size:.7rem">
+              <span style="color:var(--muted)">${s.time} &nbsp;<strong style="color:var(--text)">${s.label}</strong></span>
+              <span style="color:var(--faint);font-size:.62rem;max-width:55%;text-align:right">${(s.note||s.detail||'').substring(0,40)}</span>
+            </div>`
+          ).join('')}
+        </div>
+      </div>`;
+    }).join('');
+
+    // Build market session highlights
+    const sessions = [
+      { name:'亚盘', range:'08:00–16:00', UTC:'亚洲盘(UTC+8)', color:'#38a8e0' },
+      { name:'欧盘', range:'08:00–16:00', UTC:'欧洲盘', color:'#28c870' },
+      { name:'美盘', range:'16:00–24:00', UTC:'美洲盘', color:'#e04848' },
+    ];
+    const sessionSummary = sessions.map(sess => {
+      const [hs, he] = sess.range.split('–').map(t => parseInt(t.split(':')[0]));
+      const sessHours = Object.entries(byHour).filter(([hh]) => {
+        const h = parseInt(hh);
+        return h >= hs && h < he;
+      });
+      const totalSigs = sessHours.reduce((s,[,sigs]) => s + sigs.length, 0);
+      const bullSigs  = sessHours.reduce((s,[,sigs]) => s + sigs.filter(x=>x.isBull).length, 0);
+      const pct = totalSigs > 0 ? Math.round(bullSigs/totalSigs*100) : 50;
+      const peakH = sessHours.sort((a,b)=>b[1].length-a[1].length)[0];
+      return `<div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:.65rem;color:var(--faint);margin-bottom:2px">${sess.UTC}</div>
+        <div style="font-size:.9rem;font-weight:700;color:${sess.color}">${sess.name}</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-bottom:8px">${sess.range} UTC</div>
+        <div style="font-size:1.2rem;font-weight:700;color:${pct>=55?'var(--bull)':pct<=45?'var(--bear)':'var(--gold)'}">
+          ${pct>=55?'▲ 偏多':pct<=45?'▼ 偏空':'→ 中性'}
+        </div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:4px">${totalSigs}个信号 · 多空比${pct}%</div>
+        ${peakH ? `<div style="font-size:.65rem;color:var(--gold);margin-top:4px">峰值时段：${peakH[0]}:xx</div>` : ''}
+      </div>`;
+    }).join('');
+
+    panels['intraday'] = `
+      <div class="panel">
+        <div class="panel-title">⏰ 今日盘中时刻 <span style="font-size:.65rem;color:var(--faint);font-weight:400">UTC+8</span></div>
+
+        <!-- 三大时段 -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+          ${sessionSummary}
+        </div>
+
+        <!-- 峰值时段 -->
+        ${topHours.length ? `<div style="margin-bottom:12px">
+          <div style="font-size:.62rem;font-weight:700;color:var(--faint);letter-spacing:.06em;margin-bottom:6px">高峰时段</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${topHours.map((hh,i)=>{
+              const sigs=byHour[hh]||[];
+              const dom=sigs.filter(s=>s.isBull).length>=sigs.filter(s=>!s.isBull).length;
+              const icons=['🥇','🥈','🥉'];
+              return `<div style="display:flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid rgba(200,168,74,.25);border-radius:8px;background:rgba(200,168,74,.05)">
+                <span style="font-size:.7rem;color:var(--faint)">${icons[i]}</span>
+                <span style="font-size:1.05rem;font-weight:800;color:var(--gold);font-family:monospace">${hh}:00</span>
+                <span style="font-size:.68rem;color:${dom?'var(--bull)':'var(--bear)'}">${dom?'▲ 偏多':'▼ 偏空'}</span>
+                <span style="font-size:.6rem;color:var(--faint)">${sigs.length}系统</span>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- 逐时辰信号表 -->
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${Object.entries(byHour).sort(([a],[b])=>a.localeCompare(b)).map(([hh,sigs])=>{
+            const isTop=topHours.includes(hh);
+            const bullSigs=sigs.filter(s=>s.isBull), bearSigs=sigs.filter(s=>!s.isBull);
+            const dom=bullSigs.length>=bearSigs.length;
+            const maxConf=Math.max(...sigs.map(s=>s.conf||0.5));
+            return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+              border-radius:7px;border:1px solid ${isTop?'rgba(200,168,74,.3)':'var(--border)'};
+              background:${isTop?'rgba(200,168,74,.06)':'transparent'}">
+              <span style="font-family:monospace;font-size:.8rem;font-weight:${isTop?800:400};color:${isTop?'var(--gold)':'var(--muted)'};width:40px;flex-shrink:0">${hh}:xx</span>
+              <span style="font-size:.7rem;font-weight:700;color:${dom?'var(--bull)':'var(--bear)'};width:36px;flex-shrink:0">${dom?'▲ 多':'▼ 空'}</span>
+              <div style="flex:1;display:flex;flex-wrap:wrap;gap:3px">
+                ${sigs.slice(0,4).map(s=>`<span style="font-size:.6rem;padding:1px 6px;border-radius:99px;
+                  background:${s.isBull?'rgba(20,120,62,.1)':'rgba(168,32,32,.1)'};
+                  color:${s.isBull?'var(--bull)':'var(--bear)'};
+                  border:1px solid ${s.isBull?'rgba(20,120,62,.2)':'rgba(168,32,32,.2)'}">${s.source||s.label}</span>`).join('')}
+              </div>
+              <span style="font-size:.62rem;color:var(--faint);flex-shrink:0">${((maxConf||0)*100).toFixed(0)}%</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+  // ── CHAN + GANN DEDUCTION PANEL ──────────────────────────────────────────
+  {
+    const fmtP = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n)||_n===0)return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():_n>=1?'$'+_n.toFixed(2):'$'+_n.toFixed(4); };
+    const fmtDate = d => d instanceof Date && !isNaN(d) ? d.toLocaleDateString('zh-CN',{month:'long',day:'numeric'}) : '--';
+    const P   = price  || 50000;
+    const BL  = breakLevel || P * 1.04;
+    const chx = ch || {};
+    const gtx = gt || {};
+    const AT  = gtx.AT || 0;   // 自动推算的原角度线目标
+    const AR  = gtx.AR || 0;   // 自动推算的修正目标
+
+    // 突破确认状态颜色
+    const bColor = chx.breakColor || 'var(--muted)';
+    const bStatus = chx.breakStatus || '--';
+
+    // 路径A / B 渲染
+    const scenarioRow = (scn, key) => {
+      const s = gtx.scenario?.[key];
+      if (!s) return '';
+      const isA = key === 'A';
+      return `<div style="border-radius:10px;border:1px solid ${isA?'rgba(24,145,80,0.3)':'rgba(192,48,48,0.25)'};padding:14px;margin-bottom:10px;background:${isA?'rgba(24,145,80,0.05)':'rgba(192,48,48,0.04)'}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <span style="font-size:.85rem;font-weight:700;color:${isA?'var(--bull)':'var(--bear)'}">${s.label}</span>
+            <span style="font-size:.65rem;color:var(--muted);margin-left:8px">预计 ${s.daysEst} 天</span>
+          </div>
+          <span style="font-size:.65rem;padding:2px 9px;border-radius:99px;background:${isA?'rgba(24,145,80,0.12)':'rgba(192,48,48,0.1)'};color:${isA?'var(--bull)':'var(--bear)'}">置信 ${(s.conf*100).toFixed(0)}%</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px">
+          触发条件：${s.condition}
+        </div>
+        <div style="position:relative;padding-left:20px">
+          ${s.steps.map((st,i) => `
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;position:relative">
+              <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${st.key?(isA?'var(--bull)':'var(--bear)'):'var(--border2)'};background:${st.key?(isA?'rgba(24,145,80,0.15)':'rgba(192,48,48,0.12)'):'var(--bg2)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.6rem;font-weight:700;color:${st.key?(isA?'var(--bull)':'var(--bear)'):'var(--faint)'}">
+                ${i+1}
+              </div>
+              <div style="flex:1">
+                <span style="font-size:.78rem;font-weight:${st.key?'700':'400'};color:${st.key?'var(--text)':'var(--muted)'}">
+                  ${fmtP(st.price)}
+                </span>
+                <span style="font-size:.68rem;color:var(--faint);margin-left:6px">${st.note}</span>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    };
+
+    // 江恩关键节点时间轴
+    const keyNodeRows = (gtx.keyNodes||[]).map((kn,i) => {
+      const icons = ['◇','◈','★','◈','◇'];
+      const isMain = i === 2 || i === 4;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;margin-bottom:4px;background:${isMain?'rgba(200,168,74,0.08)':'transparent'};border:1px solid ${isMain?'rgba(200,168,74,0.2)':'transparent'}">
+        <span style="font-size:.8rem;color:${isMain?'var(--gold)':'var(--faint)'}">${icons[i]||'·'}</span>
+        <div style="flex:1">
+          <span style="font-size:.72rem;font-weight:${isMain?'700':'400'};color:${isMain?'var(--text)':'var(--muted)'}">
+            +${kn.days}天 &nbsp; ${fmtDate(kn.date)}
+          </span>
+        </div>
+        <span style="font-size:.78rem;font-weight:600;color:var(--gold)">${fmtP(kn.price)}</span>
+      </div>`;
+    }).join('');
+
+    panels['deduction'] = `
+      <div class="panel">
+        <div class="panel-title">🧭 缠论·江恩融合推演 · 走势路径分析</div>
+
+        <!-- 核心状态一览 -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px">
+
+          <!-- 突破确认价 -->
+          <div style="background:rgba(200,168,74,0.07);border:1px solid rgba(200,168,74,0.25);border-radius:10px;padding:14px">
+            <div style="font-size:.65rem;color:var(--faint);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em">突破确认价（阻力线）</div>
+            <div style="font-size:1.4rem;font-weight:800;font-family:Cinzel,serif;color:var(--gold)">${fmtP(BL)}</div>
+            <div style="margin-top:6px;font-size:.78rem">
+              状态：<strong style="color:${bColor}">${bStatus}</strong>
+              ${chx.belowBreak ? `<span style="font-size:.68rem;color:var(--muted);margin-left:6px">还差 ${fmtP(chx.distToBreak||0)} (${chx.pctToBreak||'--'}%)</span>` : ''}
+            </div>
+            <div style="margin-top:8px;font-size:.7rem;color:var(--muted);line-height:1.6">
+              ${chx.inDemand ? '<span style="color:var(--bull)">✦ 当前处于需求区（小级别买点）</span>' : ''}
+              ${chx.belowBreak ? `<br>放量突破并站稳 ${fmtP(BL)} 看多信号确认` : '<br><span style="color:var(--bull)">已突破 · 关注回踩 '+fmtP(chx.retest||BL)+' 支撑</span>'}
+            </div>
+          </div>
+
+          <!-- 江恩角度线修正 -->
+          <div style="background:rgba(56,168,224,0.06);border:1px solid rgba(56,168,224,0.2);border-radius:10px;padding:14px">
+            <div style="font-size:.65rem;color:var(--faint);margin-bottom:4px;text-transform:uppercase;letter-spacing:.08em">江恩角度线推算（自动）</div>
+            <div style="font-size:.82rem;font-weight:700;color:${gtx.angleStrength==='weak'?'var(--bear)':gtx.angleStrength==='fading'?'var(--amber)':'var(--bull)'}">
+              ${gtx.angleLabel || '--'}
+            </div>
+            <div style="margin-top:8px;font-size:.75rem;line-height:1.9">
+              <div><span style="color:var(--faint)">原角度线目标</span> <span style="color:var(--bear);text-decoration:${gtx.angleStrength!=='intact'?'line-through':'none'}">${fmtP(gtx.AT||0)}</span>${gtx.angleStrength!=='intact'?' <span style="font-size:.62rem;color:var(--faint)">已失效</span>':''}</div>
+              <div><span style="color:var(--faint)">修正目标</span> <strong style="color:var(--gold)">${fmtP(gtx.AR||0)}</strong></div>
+              <div><span style="color:var(--faint)">推算目标日</span> <strong style="color:var(--sky)">${gtx.targetD ? gtx.targetD.toLocaleDateString('zh-CN',{month:'long',day:'numeric'}) : '--'}</strong> <span style="font-size:.65rem;color:var(--faint)">(约${gtx.daysToTarget||'--'}天后)</span></div>
+              <div><span style="color:var(--faint)">高低点角度差</span> <span style="color:var(--muted)">${gtx.angleHL||'--'}°</span></div>
+              <div><span style="color:var(--faint)">距目标剩余角度</span> <span style="color:var(--muted)">${gtx.angToAR||'--'}°</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 突破后目标链 -->
+        ${chx.BL ? `
+        <div style="background:rgba(24,145,80,0.05);border:1px solid rgba(24,145,80,0.2);border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="font-size:.78rem;font-weight:700;color:var(--bull);margin-bottom:10px">▲ 突破 ${fmtP(BL)} 后的目标价链</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+            ${[
+              {label:'T1 (×0.618)', price: chx.postBreakT1, note:'第一目标'},
+              {label:'T2 (×1.0)',   price: chx.postBreakT2, note:'等幅目标'},
+              {label:'T3 (×1.618)', price: chx.postBreakT3, note:'黄金扩展'},
+            ].map(t => `<div style="background:rgba(24,145,80,0.08);border:1px solid rgba(24,145,80,0.2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:.62rem;color:var(--faint)">${t.label}</div>
+              <div style="font-size:.92rem;font-weight:700;color:var(--bull)">${fmtP(t.price)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">${t.note}</div>
+            </div>`).join('')}
+          </div>
+          <div style="margin-top:8px;font-size:.68rem;color:var(--muted);padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px">
+            回踩确认位（突破后第一支撑）：<strong style="color:var(--gold)">${fmtP(chx.retest||BL)}</strong> &nbsp;·&nbsp; 跌回阻力线则信号失效
+          </div>
+        </div>` : ''}
+
+        <!-- 未突破时的下探目标 -->
+        <div style="background:rgba(192,48,48,0.04);border:1px solid rgba(192,48,48,0.18);border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="font-size:.78rem;font-weight:700;color:var(--bear);margin-bottom:10px">▼ 若无法突破 ${fmtP(BL)} 的下探路径</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+            <div style="background:rgba(192,48,48,0.07);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:.62rem;color:var(--faint)">回测前低</div>
+              <div style="font-size:.92rem;font-weight:700;color:var(--bear)">${fmtP(chx.failTarget||low||0)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">支撑确认</div>
+            </div>
+            <div style="background:rgba(192,48,48,0.1);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:.62rem;color:var(--faint)">弱势下探</div>
+              <div style="font-size:.92rem;font-weight:700;color:var(--bear)">${fmtP(chx.failTarget2||low||0)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">前低 ×0.98</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:.68rem;color:var(--muted);padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px">
+            走弱路径：无法突破 → 震荡 → 再探前低 → 结构更弱 → 弱势上行修复
+          </div>
+        </div>
+
+        <!-- 次高点推演 -->
+        ${AR > 0 ? `
+        <div style="background:rgba(200,168,74,0.06);border:1px solid rgba(200,168,74,0.22);border-radius:10px;padding:14px;margin-bottom:14px">
+          <div style="font-size:.78rem;font-weight:700;color:var(--gold);margin-bottom:10px">◈ 次高点推演（背驰后回落·以次高形式呈现）</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+            <div style="text-align:center;padding:10px;background:rgba(200,168,74,0.08);border-radius:8px">
+              <div style="font-size:.62rem;color:var(--faint)">修正主目标</div>
+              <div style="font-size:.9rem;font-weight:700;color:var(--gold)">${fmtP(AR)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">触达后背驰</div>
+            </div>
+            <div style="text-align:center;padding:10px;background:rgba(200,168,74,0.06);border-radius:8px">
+              <div style="font-size:.62rem;color:var(--faint)">近次高 (−3%)</div>
+              <div style="font-size:.9rem;font-weight:700;color:var(--amber)">${fmtP(gtx.subHighA||AR)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">轻度背驰</div>
+            </div>
+            <div style="text-align:center;padding:10px;background:rgba(200,168,74,0.05);border-radius:8px">
+              <div style="font-size:.62rem;color:var(--faint)">远次高 (−6%)</div>
+              <div style="font-size:.9rem;font-weight:700;color:var(--amber)">${fmtP(gtx.subHighB||AR)}</div>
+              <div style="font-size:.62rem;color:var(--muted)">明显背驰</div>
+            </div>
+          </div>
+          <div style="font-size:.7rem;color:var(--muted);line-height:1.7;padding:8px 10px;background:rgba(200,168,74,0.06);border-radius:6px">
+            推演思路：价格触达修正目标 ${fmtP(AR)} 附近 → MACD 出现顶背驰 → 回落 →
+            ${gtx.targetD ? fmtDate(gtx.targetD) : '目标日期'}前后以次高 ${fmtP(gtx.subHighA||AR)} 形式呈现 →
+            次高确认后可布局做空或止盈
+          </div>
+        </div>` : ''}
+
+        <!-- 双路径走势推演 -->
+        <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:.05em">🗺 双路径走势推演</div>
+        ${scenarioRow(gtx.scenario, 'A')}
+        ${scenarioRow(gtx.scenario, 'B')}
+
+        <!-- 江恩时间轴 -->
+        ${gtx.keyNodes && gtx.keyNodes.length > 0 ? `
+        <div style="margin-top:14px">
+          <div style="font-size:.72rem;font-weight:700;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">⬡ 江恩时间价格坐标轴</div>
+          <div style="font-size:.65rem;color:var(--muted);margin-bottom:8px">以基准日→目标日，按黄金比例切分的关键节点预期价格</div>
+          ${keyNodeRows}
+        </div>` : ''}
+
+        <!-- 操作总结 -->
+        <div style="margin-top:14px;padding:14px;background:rgba(112,48,184,0.07);border:1px solid rgba(112,48,184,0.2);border-radius:10px">
+          <div style="font-size:.72rem;font-weight:700;color:var(--purple);margin-bottom:8px">⚡ 综合操作参考</div>
+          <div style="font-size:.8rem;color:var(--text);line-height:1.9">
+            ${chx.inDemand ? '✦ <strong>当前处于小级别需求区</strong>，已产生初步支撑，可轻仓试多。<br>' : ''}
+            ${chx.belowBreak
+              ? `⬆ <strong>关键阻力 ${fmtP(BL)}</strong>：等待放量突破并站稳，确认后顺势追多。突破前不追高。<br>
+                 ⬇ 若无法突破，耐心等待回探 <strong>${fmtP(chx.failTarget||low||0)}</strong> 支撑后再判断方向。`
+              : `✅ <strong>已突破 ${fmtP(BL)}</strong>，关注回踩 <strong>${fmtP(chx.retest||BL)}</strong> 不破则继续持多。`}
+            ${AR > 0 ? `<br>🎯 上方修正目标 <strong>${fmtP(AR)}</strong>（原目标 ${AT>0?fmtP(AT):'--'} 已失效），触达后注意背驰信号，以次高形式离场。` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── LOGIC TRANSPARENCY PANEL ─────────────────────────────────────────────
+  {
+    const fmtPl = v => { const _v=Number(v); if(isNaN(_v)||!isFinite(_v))return'--'; return _v>=1000?'$'+Math.round(_v).toLocaleString():_v>0?'$'+_v.toFixed(2):'--'; };
+    const logicRows = [
+      sys.qimen && qm ? {
+        sys: '☲ 奇门遁甲', color: 'var(--gold)',
+        // 奇门职责：时间窗口，显示进出时机而非价格偏向
+        verdict: '入市：'+qm.direction,
+        vcolor: qm.direction==='多'?'var(--bull)':qm.direction==='空'?'var(--bear)':'var(--muted)',
+        why: `${qm.format}格局·${qm.isYang?'阳遁':'阴遁'}第${qm.juNum}局（${qm.jieqi}）。当前${qm.door}（${['开门','生门','休门'].includes(qm.door)?'吉门，宜出击':'凶门，宜守候'}），${qm.star}临宫，${qm.god}坐镇。📅 建议入市：${qm.entryTime}，出市：${qm.exitTime}。`,
+      } : null,
+      sys.iching && ic ? {
+        sys: '䷀ 易　经', color: 'var(--crimson)',
+        // 易经职责：趋势周期，显示趋势方向和变化时间
+        verdict: ic.trend + '·' + ic.judgment,
+        vcolor: ic.bias > 0.3 ? 'var(--bull)' : ic.bias < -0.3 ? 'var(--bear)' : 'var(--muted)',
+        why: `本卦${ic.hex[0]}（${ic.hexagram}·${ic.hex[2]}），上${ic.upperName}下${ic.lowerName}，第${ic.line}爻动→变${ic.changingHex}。趋势判断：${ic.trend}。⏰ 预计约${ic.changeDay}日后出现关键变化（${ic.judgment}）。`,
+      } : null,
+      sys.vedic && ve ? {
+        sys: '✦ 印度占星', color: 'var(--indigo)',
+        // 印度占星职责：大周期，显示周期类型和能量
+        verdict: ve.cycle + '期·' + ve.energy + '能量',
+        vcolor: ve.cycle==='扩张'?'var(--bull)':ve.cycle==='收缩'?'var(--bear)':'var(--muted)',
+        why: ve.cycleNote + `。${ve.dasha}大运/${ve.antar}小运，过境${ve.trans}，「${ve.yoga}」激活。`,
+      } : null,
+      sys.gann && gn ? {
+        sys: '⬡ 江恩理论', color: 'var(--emerald)',
+        verdict: gn.bias > 0.2 ? '看多' : gn.bias < -0.2 ? '看空' : '中性',
+        vcolor: gn.bias > 0.2 ? 'var(--bull)' : gn.bias < -0.2 ? 'var(--bear)' : 'var(--muted)',
+        why: `九方格推算关键价位，当前${gn.activeAng}°角度线${gn.bias>0?'支撑有效':'已被跌破'}。角线修正目标 ${fmtPl(gt?.AR||0)}，约${gt?.daysToTarget||'--'}天后到达（${gt?.angleLabel||''}）。${finalTarget?'综合目标价：'+fmtPl(finalTarget)+'。':''}`,
+      } : null,
+      sys.harmonic && hr ? {
+        sys: '◈ 谐波形态', color: 'var(--teal)',
+        verdict: hr.bias > 0.2 ? '看多' : hr.bias < -0.2 ? '看空' : '无信号',
+        vcolor: hr.bias > 0.2 ? 'var(--bull)' : hr.bias < -0.2 ? 'var(--bear)' : 'var(--muted)',
+        why: hr.patterns.length > 0
+          ? `识别到${hr.patterns.length}个谐波形态：${hr.patterns.map(p=>p.name+(p.bullish?'看涨':'看跌')).join('、')}。PRZ完成度最高 ${(Math.max(...hr.patterns.map(p=>p.completion))*100).toFixed(0)}%，${hr.bias>0?'多数形态看涨':'多数形态看跌'}。`
+          : '当前价格区间未识别到有效谐波形态，暂无信号。',
+      } : null,
+      sys.sr && sr ? {
+        sys: '▤ 支撑阻力', color: 'var(--amber)',
+        verdict: sr.bias > 0.2 ? '支撑强' : sr.bias < -0.2 ? '阻力强' : '区间震荡',
+        vcolor: sr.bias > 0.2 ? 'var(--bull)' : sr.bias < -0.2 ? 'var(--bear)' : 'var(--muted)',
+        why: `斐波那契回撤、江恩方格、心理价位三法共振计算。当前价格${sr.bias>0?'处于支撑区域上方，下方支撑强劲':'临近阻力位，上行压力大'}，关键共振位聚集度高。`,
+      } : null,
+      sys.chan && ch ? {
+        sys: '∿ 缠　论', color: 'var(--rose)',
+        verdict: ch.beichi ? ch.beichiType : `${ch.bspType||''}${ch.bspDir||''}`,
+        vcolor: (ch.beichi&&ch.beichiType==='底背驰')||(ch.bspDir==='买点') ? 'var(--bull)' : 'var(--bear)',
+        why: `${ch.biCount}笔结构，当前${ch.biDir==='up'?'上行':'下行'}笔，中枢[$${(ch&&ch.zsLow||0).toLocaleString()}-$${(ch&&ch.zsHigh||0).toLocaleString()}]${ch.zsValid?'有效':'构建中'}。${ch.beichi?`检测到${ch.beichiType}，${ch.beichiType==='底背驰'?'绝佳买点信号':'顶部止盈信号'}。`:''}${ch.inDemand?'价格处于需求区。':''}`,
+      } : null,
+      sys.volRate && va ? {
+        sys: '⚙ 波动率', color: '#d4a843',
+        // 波动率职责：修正系数，不独立给方向
+        verdict: '修正×' + (va.correction||1).toFixed(3),
+        vcolor: 'var(--amber)',
+        why: `0.809波动率共振修正系数：${(va.correction||1).toFixed(4)}（价格误差修正）。最近共振价位：${fmtPl(va.resonance||0)}。${va.strongRes&&va.strongRes[0]?'最强共振：'+fmtPl(va.strongRes[0].price)+'。':''}`,
+      } : null,
+      sys.ziwei && zw ? {
+        sys: '☽ 紫微斗数', color: '#9040d8',
+        // 紫微职责：时间窗口，显示吉凶时辰
+        verdict: '吉时：'+((zw.goodTime||[]).join('/')||'--'),
+        vcolor: '#9040d8',
+        why: `${zw.stemNote}。财帛宫${zw.wealthStar}，官禄宫${zw.careerStar}。📅 今日吉时：${(zw.goodTime||[]).join('、')||'--'}${zw.badTime&&zw.badTime.length?'，凶时：'+(zw.badTime||[]).join('、'):''}。流年在${zw.fYearPal?.name||'--'}宫，流月在${zw.fMonthPal?.name||'--'}宫。`,
+      } : null,
+    ].filter(Boolean);
+
+    panels['logic'] = `
+      <div class="panel">
+        <div class="panel-title">🔍 各系统推算依据透明化</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:14px;line-height:1.7;padding:8px 12px;background:rgba(200,168,74,0.05);border-radius:8px">
+          每个系统给出看多/看空结论的<strong>具体原因</strong>，让你知道「为什么是这个结论」，而不只是一个方向标签。
+        </div>
+        <div>
+          ${logicRows.map(r => `
+            <div class="logic-row">
+              <div class="logic-sys" style="color:${r.color}">${r.sys}</div>
+              <div class="logic-why">${r.why}</div>
+              <div class="logic-verdict" style="color:${r.vcolor}">${r.verdict}</div>
+            </div>`).join('')}
+        </div>
+        ${logicRows.length === 0 ? '<div style="color:var(--muted);text-align:center;padding:30px">请启用至少一个分析系统</div>' : ''}
+      </div>`;
+  }
+
+  // ── MULTI-COIN COMPARE PANEL ──────────────────────────────────────────────
+  panels['multicoin'] = `
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="panel-title" style="margin:0">🔀 多币种对比分析</div>
+        <button onclick="fetchMultiCoin()" style="background:rgba(200,168,74,0.1);border:1px solid rgba(200,168,74,0.3);color:var(--gold);border-radius:6px;padding:5px 14px;font-size:.72rem;cursor:pointer;font-family:inherit;font-weight:600">⬇ 抓取实时数据</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:14px;line-height:1.7;padding:8px 12px;background:rgba(200,168,74,0.05);border-radius:8px">
+        同时抓取 BTC / ETH / SOL / BNB 实时价格，对每个币种运行江恩 + 缠论 + 奇门等核心引擎，比较<strong>综合评分、角线目标、多空偏向</strong>，帮你选出当前最强势的交易标的。<br>
+        <span style="color:var(--faint)">点击卡片可一键填入表单进行完整分析。</span>
+      </div>
+      <div class="mcoin-grid" id="multiCoinGrid">
+        <div style="font-size:.8rem;color:var(--muted);padding:20px;text-align:center;grid-column:1/-1">
+          点击上方「抓取实时数据」按钮开始多币对比
+        </div>
+      </div>
+    </div>`;
+
+
+  if(sys.qimen) {
+    const [bc,bl] = biasBadge(qm.bias);
+    panels['qimen'] = `
+      <div class="cards-grid">
+        <div class="card card-qm">
+          <div class="card-head">
+            <span class="card-icon">☲</span>
+            <div><div class="card-name">奇門遁甲</div><div class="card-sub">时空格局 · 天干地支</div></div>
+            <span class="badge ${bc}">${bl}</span>
+          </div>
+          ${row('值符宫位','第'+qm.palace+'宫','hi')}
+          ${row('当前星',qm.star)}
+          ${row('当前门',qm.door)}
+          ${row('神将',qm.god)}
+          ${row('旬首干支',qm.stem+'干'+qm.branch+'支')}
+          ${row('卦宫',qm.bagua)}
+          ${row('局格',qm.format,'amber')}
+          ${row('节气',qm.jieqi||'--','hi')}
+          ${row('推算置信',((qm&&qm.conf||0)*100).toFixed(0)+'%','hi')}
+        </div>
+        <div class="card card-qm">
+          <div class="card-head"><span class="card-icon">⏰</span><div><div class="card-name">时机窗口（职责域）</div><div class="card-sub">奇门专长：进出时机</div></div></div>
+          ${row('入市方向', qm.direction, qm.direction==='多'?'bull':qm.direction==='空'?'bear':'hi')}
+          ${row('入市时辰', qm.entryTime, 'bull')}
+          ${row('出市时辰', qm.exitTime, 'bear')}
+          ${row('今日吉时', (qm.goodTimes||[]).join('、'), 'bull')}
+          ${row('今日凶时', (qm.badTimes||[]).join('、')||'无', 'bear')}
+          ${row('动静分析',qm.door==='开门'||qm.door==='生门'?'动象，宜出击':'静象，宜守候')}
+          ${row('方位提示',['东方','东南','南方','西南','西方','西北','北方','东北'][qm.palace-1]+'方位吉利')}
+        </div>
+      </div>`;
+  }
+
+  // IChing panel
+  if(sys.iching) {
+    const [bc,bl] = biasBadge(ic.bias);
+    panels['iching'] = `
+      <div class="cards-grid">
+        <div class="card card-ic">
+          <div class="card-head">
+            <span class="card-icon">䷀</span>
+            <div><div class="card-name">易經卦象</div><div class="card-sub">卦象推演 · 变爻研判</div></div>
+            <span class="badge ${bc}">${bl}</span>
+          </div>
+          ${row('本卦',ic.hex[0]+' '+ic.hex[1]+'卦','hi')}
+          ${row('卦义',ic.hex[2])}
+          ${row('上卦',ic.upper+'（'+ic.upperName+'）')}
+          ${row('下卦',ic.lower+'（'+ic.lowerName+'）')}
+          ${row('动爻','第'+ic.line+'爻')}
+          ${row('变卦',ic.rhex[0]+' '+ic.rhex[1]+'卦')}
+          ${row('变卦义',ic.rhex[2])}
+          ${row('卦断',ic.judgment,ic.judgment==='大吉'?'bull':ic.judgment==='大凶'?'bear':'hi')}
+          ${row('推算置信',((ic&&ic.conf||0)*100).toFixed(0)+'%','hi')}
+        </div>
+        <div class="card card-ic">
+          <div class="card-head"><span class="card-icon">📅</span><div><div class="card-name">趋势周期（职责域）</div><div class="card-sub">易经专长：周期与变化时间</div></div></div>
+          ${row('趋势方向', ic.trend, ic.trend==='上升'?'bull':ic.trend==='下跌'?'bear':'hi')}
+          ${row('变化时间', ic.changeDay+'日后', ic.trend==='上升'?'bull':'bear')}
+          ${row('本卦',     ic.hexagram, 'hi')}
+          ${row('变卦',     ic.changingHex)}
+          ${row('操作建议',ic.bias>0.3?'可积极追涨，顺势而为':ic.bias>0?'轻仓试多，稳健布局':ic.bias<-0.3?'减仓规避，静待转机':'观望为宜，等待信号')}
+          ${row('变化方向',ic.rhex[1]+'·'+ic.rhex[2]+'·'+(ic.bias>0?'由弱转强':'由强转弱'))}
+        </div>
+      </div>`;
+  }
+
+  // Vedic panel
+  if(sys.vedic) {
+    const [bc,bl] = biasBadge(ve.bias);
+    panels['vedic'] = `
+      <div class="cards-grid">
+        <div class="card card-ve">
+          <div class="card-head">
+            <span class="card-icon">✦</span>
+            <div><div class="card-name">印度占星</div><div class="card-sub">行星周期 · 大运小运</div></div>
+            <span class="badge ${bc}">${bl}</span>
+          </div>
+          ${row('上升星座月宿',ve.asc,'hi')}
+          ${row('月亮星宿',ve.moon)}
+          ${row('星座',ve.rasi+'座')}
+          ${row('命主星',ve.lord)}
+          ${row('过境行星',ve.trans)}
+          ${row('大运',ve.dasha+'大运')}
+          ${row('小运',ve.antar+'小运')}
+          ${row('吉祥瑜伽',ve.yoga,'teal')}
+          ${row('推算置信',((ve&&ve.conf||0)*100).toFixed(0)+'%','hi')}
+        </div>
+        <div class="card card-ve">
+          <div class="card-head"><span class="card-icon">🪐</span><div><div class="card-name">大周期（职责域）</div><div class="card-sub">印度占星专长：宏观周期</div></div></div>
+          ${row('主导周期', ve.cycle+'期', ve.cycle==='扩张'?'bull':ve.cycle==='收缩'?'bear':'hi')}
+          ${row('能量指数', ve.energy+'/100', ve.energy>=60?'bull':ve.energy<=40?'bear':'hi')}
+          ${row('主导行星', ve.planet, 'amber')}
+          ${row('周期说明', ve.cycleNote||'')}
+          ${row('关键节点',ve.dasha+'大运'+ve.antar+'小运交汇')}
+          ${row('能量评级',ve.energy>=80?'★★★★★':ve.energy>=60?'★★★★':ve.energy>=40?'★★★':ve.energy>=20?'★★':'★', ve.energy>=60?'bull':'bear')}
+        </div>
+      </div>`;
+  }
+
+  // Gann panel
+  if(sys.gann) {
+    panels['gann'] = buildGannPanel(gn, coin);
+  }
+
+  // Harmonic panel
+  if(sys.harmonic) {
+    const [bc,bl] = biasBadge(hr.bias);
+    const patternColors = {
+      '蝙蝠':'rgba(40,184,168,0.12)','螃蟹':'rgba(224,72,72,0.1)','加菲猫':'rgba(200,168,74,0.1)',
+      '蝴蝶':'rgba(96,96,224,0.1)','深蟹':'rgba(224,136,48,0.1)','鲨鱼':'rgba(224,72,128,0.1)',
+      'ABCD':'rgba(40,200,112,0.1)','三驱':'rgba(160,160,255,0.1)'
+    };
+    const patternBorder = {
+      '蝙蝠':'rgba(40,184,168,0.35)','螃蟹':'rgba(224,72,72,0.3)','加菲猫':'rgba(200,168,74,0.35)',
+      '蝴蝶':'rgba(96,96,224,0.3)','深蟹':'rgba(224,136,48,0.3)','鲨鱼':'rgba(224,72,128,0.35)',
+      'ABCD':'rgba(40,200,112,0.3)','三驱':'rgba(160,160,255,0.3)'
+    };
+
+    const pHTML = hr.patterns.length > 0
+      ? hr.patterns.map(p => `
+        <div class="harmonic-card" style="background:${patternColors[p.name]||'rgba(40,184,168,0.08)'};border-color:${patternBorder[p.name]||'rgba(40,184,168,0.3)'}">
+          <div class="h-name" style="color:var(--teal)">${p.name} <span style="font-size:.72rem;color:var(--muted)">(${p.en})</span>
+            <span class="badge ${p.bullish?'badge-bull':'badge-bear'}" style="font-size:.68rem;padding:2px 8px;margin-left:8px">${p.bullish?'看涨':'看跌'}</span>
+          </div>
+          <div class="h-type" style="color:var(--muted)">完成度 ${((p&&p.completion||0)*100).toFixed(0)}% · 置信 ${((p&&p.conf||0)*100).toFixed(0)}%</div>
+          <div class="h-ratios">
+            <span class="h-ratio">XAB: ${p.xab}</span>
+            <span class="h-ratio">ABC: ${p.abc}</span>
+            <span class="h-ratio">BCD: ${p.bcd}</span>
+            <span class="h-ratio">XAD: ${p.xad}</span>
+          </div>
+          ${row('X点','$'+p.X.toLocaleString())}
+          ${row('A点','$'+p.A.toLocaleString())}
+          ${row('B点','$'+p.B.toLocaleString())}
+          ${row('C点','$'+p.C.toLocaleString())}
+          ${row('D点目标','$'+p.D.toLocaleString(),p.bullish?'bull':'bear')}
+          ${row('PRZ区域','$'+p.PRZ.toLocaleString(),'teal')}
+        </div>`).join('')
+      : '<div style="color:var(--muted);text-align:center;padding:30px">当前价格区间未发现有效谐波形态，建议等待更明确的形态形成</div>';
+
+    panels['harmonic'] = `
+      <div class="panel">
+        <div class="panel-title" style="justify-content:space-between">
+          <span>◈ 谐波形态识别 · 黄金比例</span>
+          <span class="badge ${bc}">${bl}</span>
+        </div>
+        <div style="margin-bottom:16px;font-size:0.82rem;color:var(--muted);line-height:1.8">
+          谐波形态基于斐波那契黄金比例（0.382/0.618/0.786/1.272/1.618等）识别市场中的特定价格结构，
+          每种形态均有潜在逆转区(PRZ)，为交易提供高概率入场点位。
+        </div>
+        <div class="harmonic-grid">${pHTML}</div>
+      </div>`;
+  }
+
+  // SR panel
+  if(sys.sr) {
+    const [bc,bl] = biasBadge(sr.bias);
+    const srDiv = document.createElement('div');
+    srDiv.className = 'panel';
+    srDiv.innerHTML = `
+      <div class="panel-title" style="justify-content:space-between">
+        <span>▤ 支撑阻力分析</span>
+        <span class="badge ${bc}">${bl}</span>
+      </div>
+      <div style="margin-bottom:16px;font-size:0.82rem;color:var(--muted);line-height:1.8">
+        综合斐波那契回撤/延伸、心理整数价位及江恩方格三大方法，识别关键支撑阻力位。
+        触碰次数越多、方法越多共振的价位，其有效性越高。
+      </div>`;
+    srDiv.appendChild(drawSRChart(sr));
+    panels['sr'] = srDiv;
+  }
+
+  // Chan Theory panel
+  if(sys.chan) {
+    const [bc,bl] = biasBadge(ch.bias);
+    const fmtPc = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():'$'+_n.toFixed(2); };
+    panels['chan'] = `
+      <div class="panel">
+        <div class="panel-title" style="justify-content:space-between">
+          <span>∿ 缠论分析</span>
+          <span class="badge ${bc}">${bl}</span>
+        </div>
+        <div style="margin-bottom:16px;font-size:0.82rem;color:var(--muted);line-height:1.8">
+          缠中说禅理论通过笔、段、中枢的递归结构分析市场，利用背驰和买卖点系统精准把握趋势转换时机。
+        </div>
+
+        <!-- 突破确认状态栏 -->
+        ${ch.BL ? `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-radius:10px;margin-bottom:14px;background:${ch.breakColor==='var(--bull)'?'rgba(24,145,80,0.08)':ch.breakColor==='var(--amber)'?'rgba(192,120,0,0.08)':'rgba(192,48,48,0.07)'};border:1px solid ${ch.breakColor==='var(--bull)'?'rgba(24,145,80,0.3)':ch.breakColor==='var(--amber)'?'rgba(192,120,0,0.3)':'rgba(192,48,48,0.2)'}">
+          <div>
+            <div style="font-size:.65rem;color:var(--faint);margin-bottom:2px">突破确认价</div>
+            <div style="font-size:1.2rem;font-weight:800;font-family:Cinzel,serif;color:var(--gold)">${fmtPc(ch.BL)}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:1rem;font-weight:700;color:${ch.breakColor}">${ch.breakStatus}</div>
+            ${ch.belowBreak ? `<div style="font-size:.68rem;color:var(--muted)">还差 ${fmtPc(ch.distToBreak)}</div>` : ''}
+          </div>
+          <div style="text-align:right;font-size:.72rem;color:var(--muted)">
+            ${ch.inDemand ? '<span style="color:var(--bull)">✦ 在需求区</span>' : ''}
+          </div>
+        </div>` : ''}
+
+        <div class="chan-grid">
+          <div class="chan-card">
+            <div class="chan-title">∿ 笔段分析</div>
+            <div class="chan-body">
+              <b>分型类型：</b>${ch.fractalType}（置信 ${((ch&&ch.fractalConf||0)*100).toFixed(0)}%）<br>
+              <b>笔总数：</b>${ch.biCount} 笔（上笔 ${ch.bisUp} / 下笔 ${ch.bisDown}）<br>
+              <b>当前方向：</b>${ch.biDir==='up'?'上行笔发展中':'下行笔发展中'}<br>
+              <b>段数：</b>${ch.duanCount} 段 · 方向${ch.duanDir==='up'?'向上':'向下'}<br>
+              <b>操作参考：</b>${ch.biDir==='up'?'等待顶分型确认后考虑离场':'等待底分型确认后考虑入场'}
+            </div>
+          </div>
+          <div class="chan-card">
+            <div class="chan-title">⊙ 中枢结构</div>
+            <div class="chan-body">
+              <b>中枢有效性：</b>${ch.zsValid?'有效中枢':'中枢构建中'}<br>
+              <b>中枢高点：</b>$${(ch&&ch.zsHigh||0).toLocaleString()}<br>
+              <b>中枢低点：</b>$${(ch&&ch.zsLow||0).toLocaleString()}<br>
+              <b>中枢范围：</b>$${((ch&&ch.zsHigh||0)-(ch&&ch.zsLow||0)).toLocaleString()} (${((((ch&&ch.zsHigh||0)-(ch&&ch.zsLow||0))/(price||50000))*100).toFixed(1)}%)<br>
+              <b>突破方向预判：</b>${ch.bias>0?'向上突破概率较大':'向下突破概率较大'}
+            </div>
+          </div>
+          <div class="chan-card">
+            <div class="chan-title">⚡ 背驰与买卖点</div>
+            <div class="chan-body">
+              <b>背驰信号：</b>${ch.beichi?'<span style="color:#e880a8">⚡ 检测到'+ch.beichiType+'</span>':'未检测到明确背驰'}<br>
+              ${ch.beichi?('<b>背驰级别：</b>'+ch.beichiLevel+'背驰<br>'):''}
+              <b>买卖点类型：</b>${ch.bspType}${ch.bspDir}<br>
+              <b>操作建议：</b>${
+                ch.beichi && ch.beichiType==='底背驰'?'底背驰确认，这是绝佳买点，可重仓入场':
+                ch.beichi && ch.beichiType==='顶背驰'?'顶背驰确认，建议减仓或止盈离场':
+                ch.bspDir==='买点'?'买点出现，可轻仓试多，止损设于近期低点':
+                '卖点出现，建议减仓控制风险，等待买点再入'
+              }<br>
+              <b>综合置信：</b>${((ch&&ch.conf||0)*100).toFixed(0)}%
+            </div>
+          </div>
+          <div class="chan-card">
+            <div class="chan-title">📐 三类买卖点体系</div>
+            <div class="chan-body">
+              <b>第一类买点：</b>底背驰后最低点，风险最小<br>
+              <b>第二类买点：</b>第一段上行后回调不破低，确认转势<br>
+              <b>第三类买点：</b>中枢上方回调不入中枢，趋势延续<br>
+              <b>当前判定：</b><span style="color:#e880a8">${ch.bspType}${ch.bspDir}形成${ch.beichi?'，背驰确认':'，等待确认'}</span><br>
+              <b>止损位参考：</b>中枢低点 $${(ch&&ch.zsLow||0).toLocaleString()}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── GANN × CHAN SYNERGY PANEL v2 — 真实K线驱动 ──
+  if (sys.gann && sys.chan && gn && ch) {
+    const syn = engineGannChanSynergy(gn, ch, price, klines || []);
+    // ── SignalEnhancer v2：黑天鹅+成交额+假信号+多周期+资金管理 ──────────
+    let synEnhanced = syn;
+    if (klines && klines.length >= 20 && window.SignalEnhancer) {
+      try {
+        const enhancer  = new window.SignalEnhancer(klines);
+        const rawForEnhance = {
+          ...(syn || {}),
+          zhongshu: { top: ch.zsHigh || price*1.05, bottom: ch.zsLow || price*0.95 },
+          // 若已有多周期评级（由调用方异步预置在 dashResults 中）则传入
+          _multiTFRatings: dashResults[coin]?._multiTFRatings || null,
+        };
+        synEnhanced = enhancer.enhanceSignal(rawForEnhance);
+
+        // 若多周期结果存在，将 mergedRating 回写到展示
+        if (synEnhanced.multiTF && synEnhanced.multiTF.mergedRating) {
+          synEnhanced.grade       = synEnhanced.multiTF.mergedRating;
+          synEnhanced.gradeLabel  = synEnhanced.multiTF.allSame ? '多周期一致' : '多周期取最低';
+        }
+        // 成交额过滤降级
+        if (synEnhanced.volumeFilter?.filtered) {
+          const downMap = { S:'A', A:'B', B:'C', C:'C' };
+          synEnhanced.grade = downMap[synEnhanced.grade] || synEnhanced.grade;
+          synEnhanced.gradeLabel = (synEnhanced.gradeLabel || '') + ' (量能降级)';
+        }
+        // 假信号降级
+        if (synEnhanced.fakeFilter?.isFake) {
+          const downMap = { S:'A', A:'B', B:'C', C:'C' };
+          synEnhanced.grade = downMap[synEnhanced.grade] || synEnhanced.grade;
+          synEnhanced.gradeLabel = (synEnhanced.gradeLabel || '') + ' (假信号降级)';
+        }
+      } catch(e) { console.warn('SignalEnhancer error:', e.message); }
+    }
+    const gradeColors = { S:'#e83c3c', A:'#e89838', B:'#3890e0', C:'#888' };
+    const gc = syn ? (gradeColors[syn.grade] || '#888') : '#888';
+    const fmtPr = v => { const _v=Number(v); if(isNaN(_v)||!isFinite(_v))return'--'; return _v>=1000?'$'+Math.round(_v).toLocaleString():_v>=1?'$'+_v.toFixed(2):'$'+_v.toFixed(4); };
+
+    // ── 公共: 信号行渲染 ──────────────────────────────────────────────────
+    const renderSignalRows = (signals) => signals.map(s => {
+      const bg     = s.bull ? 'rgba(24,145,80,0.07)' : 'rgba(192,48,48,0.07)';
+      const border = s.bull ? 'rgba(24,145,80,0.2)'  : 'rgba(192,48,48,0.2)';
+      const sc = s.strength === '超强' ? '#e83c3c' : s.strength === '强' ? '#e89838' : s.strength === '中' ? '#3890e0' : '#888';
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:'+bg+';border:1px solid '+border+';border-radius:9px;margin-bottom:8px">'
+        + '<div style="font-size:1.1rem;flex-shrink:0">'+s.icon+'</div>'
+        + '<div style="flex:1"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">'
+        + '<span style="font-size:.65rem;font-weight:700;padding:1px 7px;border-radius:99px;background:'+sc+'18;border:1px solid '+sc+'40;color:'+sc+'">'+s.type+'</span>'
+        + '<span style="font-size:.62rem;padding:1px 6px;border-radius:99px;background:'+sc+'12;color:'+sc+';font-weight:700">'+s.strength+'度</span>'
+        + '</div><div style="font-size:.78rem;color:var(--text);line-height:1.6">'+s.text+'</div></div>'
+        + '<div style="font-size:.72rem;font-weight:700;color:'+(s.bull?'var(--bull)':'var(--bear)')+';">'+(s.bull?'▲多':'▼空')+'</div>'
+        + '</div>';
+    }).join('');
+
+    // ── 公共: 价格共振行渲染 ─────────────────────────────────────────────
+    const renderResonanceRows = (resonances) => resonances.slice(0,4).map(r => {
+      const rc = r.strength==='超强'?'#e83c3c':r.strength==='强'?'#e89838':'#3890e0';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--card2);border-radius:7px;border:1px solid var(--border);margin-bottom:5px;font-size:.72rem">'
+        + '<span style="color:var(--gold);font-weight:700">'+fmtPr(r.price)+'</span>'
+        + '<span style="color:var(--muted);font-size:.68rem">'+r.gannLabel+' ↔ '+r.chanLabel+'</span>'
+        + '<span style="color:'+rc+';font-weight:700">'+r.strength+'共振 ('+r.diffPct+'%)</span></div>';
+    }).join('');
+
+    // ── 数据详情卡（5大核心数据展示）────────────────────────────────────
+    const buildDetailsCard = (syn) => {
+      if (!syn || !syn.details) return '';
+      const d = syn.details;
+      const db = syn._debug || {};
+      const fmtB = v => { const _v=Number(v); if(isNaN(_v)||!isFinite(_v))return'<span>--</span>'; return _v>0?'<span style="color:var(--bull)">+'+_v.toFixed(1)+'%</span>':'<span style="color:var(--bear)">'+_v.toFixed(1)+'%</span>'; };
+      const fmtN = v => v != null ? fmtPr(v) : '--';
+      return '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">'
+        + '<div style="font-size:.65rem;font-weight:700;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">🔬 五大核心计算数据（真实K线）</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:.72rem">'
+
+        // ① 江恩关键位
+        + '<div style="padding:8px 10px;background:rgba(200,168,74,0.06);border:1px solid rgba(200,168,74,0.2);border-radius:8px">'
+        + '<div style="color:var(--gold);font-weight:700;margin-bottom:5px">⬡ 江恩斐波关键位（近60根）</div>'
+        + '<div style="color:var(--muted)">区间高点：<strong style="color:var(--text)">'+fmtN(db.rangeHigh)+'</strong></div>'
+        + '<div style="color:var(--muted)">区间低点：<strong style="color:var(--text)">'+fmtN(db.rangeLow)+'</strong></div>'
+        + (d.priceResonance.exists ? '<div style="margin-top:4px;color:var(--bull)">✓ 江恩位 '+fmtN(d.priceResonance.gannLevel)+' 与缠论 '+fmtN(d.priceResonance.chanZone)+' 共振</div>' : '<div style="color:var(--faint);margin-top:4px">无价格共振（偏差>2%）</div>')
+        + '</div>'
+
+        // ② 江恩bias
+        + '<div style="padding:8px 10px;background:rgba(200,168,74,0.06);border:1px solid rgba(200,168,74,0.2);border-radius:8px">'
+        + '<div style="color:var(--gold);font-weight:700;margin-bottom:5px">⬡ 江恩bias（偏离MA20）</div>'
+        + '<div style="color:var(--muted)">MA20均线：<strong style="color:var(--text)">'+fmtN(d.directionResonance.ma20)+'</strong></div>'
+        + '<div style="color:var(--muted)">bias偏离：'+fmtB(d.directionResonance.gannBias || 0)+'</div>'
+        + '<div style="color:var(--muted);margin-top:2px;font-size:.65rem">'+(d.directionResonance.gannBias > 0 ? '价格高于MA20，偏多' : '价格低于MA20，偏空')+'</div>'
+        + '</div>'
+
+        // ③ 缠论中枢边界
+        + '<div style="padding:8px 10px;background:rgba(40,200,112,0.06);border:1px solid rgba(40,200,112,0.2);border-radius:8px">'
+        + '<div style="color:var(--teal);font-weight:700;margin-bottom:5px">∿ 缠论中枢边界</div>'
+        + '<div style="color:var(--muted)">中枢上轨：<strong style="color:var(--bear)">'+fmtN(db.chanZoneTop)+'</strong></div>'
+        + '<div style="color:var(--muted)">中枢下轨：<strong style="color:var(--bull)">'+fmtN(db.chanZoneBot)+'</strong></div>'
+        + '<div style="color:var(--muted)">中枢中轨：<strong style="color:var(--text)">'+fmtN(d.directionResonance.chanMid)+'</strong></div>'
+        + '</div>'
+
+        // ④ 缠论bias
+        + '<div style="padding:8px 10px;background:rgba(40,200,112,0.06);border:1px solid rgba(40,200,112,0.2);border-radius:8px">'
+        + '<div style="color:var(--teal);font-weight:700;margin-bottom:5px">∿ 缠论bias（偏离中轨）</div>'
+        + '<div style="color:var(--muted)">中轨偏离：'+fmtB(d.directionResonance.chanBias || 0)+'</div>'
+        + '<div style="color:var(--muted);margin-top:2px;font-size:.65rem">'+(d.directionResonance.chanBias > 0 ? '价格高于中枢，偏强' : '价格低于中枢，偏弱')+'</div>'
+        + (d.directionResonance.exists ? '<div style="margin-top:4px;color:var(--bull);font-size:.65rem">✓ 两者方向同步（方向共振）</div>' : '<div style="margin-top:4px;color:var(--faint);font-size:.65rem">方向不同步</div>')
+        + '</div>'
+        + '</div>'
+
+        // ⑤ MACD背驰（全宽）
+        + '<div style="margin-top:7px;padding:8px 10px;background:rgba(96,48,160,0.06);border:1px solid rgba(96,48,160,0.2);border-radius:8px;font-size:.72rem">'
+        + '<div style="color:var(--purple);font-weight:700;margin-bottom:5px">📈 MACD背驰检测（近40根K线）</div>'
+        + (d.divergence.exists
+            ? '<div style="color:'+(d.divergence.type==='bullish'?'var(--bull)':'var(--bear)')+'">⚡ '+d.divergence.detail+'</div>'
+              + '<div style="margin-top:4px;display:flex;align-items:center;gap:8px">'
+              + '<span style="color:var(--muted)">强度</span>'
+              + '<div style="flex:1;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+(d.divergence.strength*100).toFixed(0)+'%;background:'+(d.divergence.type==='bullish'?'var(--bull)':'var(--bear)')+';border-radius:3px"></div></div>'
+              + '<span style="color:'+(d.divergence.type==='bullish'?'var(--bull)':'var(--bear)')+';font-weight:700">'+(d.divergence.strength*100).toFixed(0)+'%</span>'
+              + '</div>'
+            : '<div style="color:var(--faint)">'+d.divergence.detail+'</div>')
+        + '</div>'
+
+        // 数据来源说明
+        + '<div style="margin-top:8px;font-size:.6rem;color:var(--faint);text-align:right">数据来源：实时K线 · K线数量 '+db.klinesCount+'根 · 分析时间 '+(syn.analysisTime||'--')+'</div>'
+        + '</div>';
+    };
+
+    const dirClass = syn ? (syn.synergyDir==='bull'?'badge-bull':syn.synergyDir==='bear'?'badge-bear':'badge-neut') : 'badge-neut';
+    const dirLabel = syn ? (syn.synergyDir==='bull'?'偏多':syn.synergyDir==='bear'?'偏空':'中性') : '中性';
+
+    if (syn && syn.rating === 'N/A') {
+      // 数据不足状态
+      panels['gannChanSynergy'] = '<div class="panel"><div class="panel-title">⬡∿ 江恩×缠论协同信号 v2</div>'
+        + '<div style="padding:24px;text-align:center;color:var(--faint);font-size:.85rem;line-height:2">'
+        + '<div style="font-size:2rem;margin-bottom:8px;opacity:.3">⬡∿</div>'
+        + syn.message
+        + '</div></div>';
+
+    } else if (syn && syn.hasSynergy) {
+      // 使用 synEnhanced（已增强）或 syn（未增强）
+      const se = synEnhanced || syn;
+      // 增强信号附加信息
+      const confBadge = se.confidence != null
+        ? '<span style="padding:2px 8px;border-radius:99px;background:rgba(56,168,224,0.15);border:1px solid rgba(56,168,224,0.3);color:var(--sky);font-size:.65rem;font-weight:700">置信 '+se.confidence+'%</span>'
+        : '';
+      const histBadge = se.history && se.history.winRate && se.history.winRate !== 'N/A'
+        ? '<span style="padding:2px 8px;border-radius:99px;background:rgba(40,200,112,0.12);border:1px solid rgba(40,200,112,0.3);color:var(--bull);font-size:.65rem">历史胜率 '+se.history.winRate+'</span>'
+        : '';
+      const validBadge = se.zhongshuValidation
+        ? '<span style="padding:2px 8px;border-radius:99px;background:'+(se.zhongshuValidation.isValid?'rgba(200,168,74,0.12)':'rgba(192,48,48,0.1)')+';border:1px solid '+(se.zhongshuValidation.isValid?'rgba(200,168,74,0.3)':'rgba(192,48,48,0.2)')+';color:'+(se.zhongshuValidation.isValid?'var(--gold)':'var(--bear)')+';font-size:.65rem">中枢'+(se.zhongshuValidation.isValid?'有效':'待确认')+'</span>'
+        : '';
+      // 历史回测行
+      const histRow = (se.history && se.history.totalSignals > 0)
+        ? '<div style="margin-bottom:10px;padding:8px 12px;background:rgba(40,200,112,0.05);border:1px solid rgba(40,200,112,0.15);border-radius:8px;font-size:.72rem;color:var(--muted)">'
+          + '<span style="color:var(--bull);font-weight:700">📊 历史回测：</span>'
+          + '共'+se.history.totalSignals+'次相似信号 &nbsp;·&nbsp; 胜率 <strong style="color:var(--bull)">'+se.history.winRate+'</strong>'
+          + '&nbsp;·&nbsp; 平均收益 <strong style="color:'+(se.history.avgReturn&&se.history.avgReturn.startsWith('+')?'var(--bull)':'var(--bear)')+'">'+se.history.avgReturn+'</strong>'
+          + '&nbsp;·&nbsp; 夏普 <strong>'+se.history.sharpeRatio+'</strong>'
+          + '</div>'
+        : '';
+      // 中枢验证理由
+      const zsReasons = (se.zhongshuValidation && se.zhongshuValidation.reasons && se.zhongshuValidation.reasons.length)
+        ? '<div style="margin-bottom:10px;padding:8px 12px;background:rgba(200,168,74,0.04);border:1px solid rgba(200,168,74,0.12);border-radius:8px">'
+          + '<div style="font-size:.62rem;font-weight:700;color:var(--gold);margin-bottom:4px">∿ 中枢稳定性验证（置信 '+(se.zhongshuValidation.confidence*100).toFixed(0)+'%）</div>'
+          + se.zhongshuValidation.reasons.map(r => '<div style="font-size:.68rem;color:var(--muted);line-height:1.7">'+r+'</div>').join('')
+          + '</div>'
+        : '';
+      // 可视化HTML（来自SignalEnhancer）
+      const vizHtml = se.visualization && se.visualization.htmlSummary ? se.visualization.htmlSummary : '';
+
+      panels['gannChanSynergy'] = '<div class="panel" style="border:1px solid '+gc+'30">'
+        + '<div class="panel-title" style="justify-content:space-between">'
+        + '<span>⬡∿ 江恩×缠论协同信号 <span style="font-size:.6rem;color:var(--faint);font-weight:400">v2 · 真实K线</span></span>'
+        + '<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        + '<span style="padding:3px 12px;border-radius:99px;background:'+gc+'18;border:1px solid '+gc+'40;color:'+gc+';font-weight:800;font-size:.8rem">'+se.grade+'级 · '+se.gradeLabel+'</span>'
+        + '<span class="badge '+dirClass+'">'+dirLabel+'</span>'
+        + confBadge + histBadge + validBadge
+        + '</span></div>'
+        + '<div style="margin-bottom:10px;padding:10px 14px;background:'+gc+'08;border:1px solid '+gc+'20;border-radius:10px;font-size:.78rem;color:var(--muted);line-height:1.7">'
+        + '江恩侧重<strong style="color:var(--gold)">Fib关键位×MA20偏离</strong>，缠论侧重<strong style="color:var(--teal)">中枢边界×MACD背驰</strong>。共振评分 <strong style="color:'+gc+'">'+(se.overallScore*100).toFixed(0)+'分</strong>'
+        + (se.confidence != null ? '&nbsp;·&nbsp; 综合置信 <strong style="color:var(--sky)">'+se.confidence+'%</strong>' : '')
+        + (se.timeWindow ? '&nbsp;·&nbsp; 时间窗口 <strong style="color:var(--gold)">'+se.timeWindow+'</strong>' : '')
+        + '</div>'
+        + histRow
+        + zsReasons
+        + '<div style="font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase">📡 共振信号列表</div>'
+        + renderSignalRows(se.signals)
+        + (se.priceResonances.length > 0 ? '<div style="font-size:.72rem;font-weight:700;color:var(--muted);margin:12px 0 8px;letter-spacing:.06em;text-transform:uppercase">📐 价格共振区位</div>'+renderResonanceRows(se.priceResonances) : '')
+        + buildDetailsCard(se)
+        + vizHtml
+        + '<div style="margin-top:12px;padding:10px 14px;background:rgba(200,168,74,0.06);border:1px solid rgba(200,168,74,0.18);border-radius:9px;font-size:.72rem;color:var(--faint);line-height:1.7">'
+        + '⚠ 共振信号基于真实K线计算，'+(se.grade==='S'?'S级为最强信号，建议配合成交量确认再操作。':'建议结合其他系统综合判断。')+'分析时间：'+(se.analysisTime||'--')+'。不构成投资建议。'
+        + '</div></div>';
+
+    } else {
+      // 无共振但展示数据卡
+      panels['gannChanSynergy'] = '<div class="panel">'
+        + '<div class="panel-title" style="justify-content:space-between">'
+        + '<span>⬡∿ 江恩×缠论协同信号 <span style="font-size:.6rem;color:var(--faint);font-weight:400">v2 · 真实K线</span></span>'
+        + '<span style="padding:3px 12px;border-radius:99px;background:#88881a;border:1px solid #88882a;color:#888;font-weight:700;font-size:.78rem">'+syn.grade+'级 · '+syn.gradeLabel+'</span>'
+        + '</div>'
+        + '<div style="padding:16px;background:rgba(0,0,0,0.03);border-radius:8px;margin-bottom:12px;font-size:.82rem;color:var(--muted);text-align:center;line-height:2">'
+        + '当前两系统未发现明确共振<br><span style="font-size:.72rem">建议等待缠论背驰信号 或 江恩Fib位与中枢边界重叠后再介入</span>'
+        + '</div>'
+        + buildDetailsCard(syn)
+        + '</div>';
+    }
+  }
+
+
+  // ── NATAL PANEL ──
+  if(sys.natal && nt) {
+    const nc = nt.nc;
+    const [bc,bl] = biasBadge(nt.bias);
+    const pRow = (k,v,c='') => '<div class="row"><span class="rk">'+k+'</span><span class="rv '+c+'">'+v+'</span></div>';
+    const planetsHtml = Object.entries(nc.planets).map(([p,d])=>{
+      const pNames = {sun:'☉太阳',moon:'☽月亮',mercury:'☿水星',venus:'♀金星',mars:'♂火星',
+                      jupiter:'♃木星',saturn:'♄土星',uranus:'♅天王',neptune:'♆海王',pluto:'♇冥王',
+                      rahu:'☊罗睺',ketu:'☋计都'};
+      const nm = pNames[p]||p;
+      const note = d.note?(' <span style="color:var(--amber);font-size:.75rem">⚡'+d.note+'</span>'):'';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(200,168,74,0.08);font-size:0.82rem">'
+        +'<span style="color:var(--gold);width:90px">'+nm+'</span>'
+        +'<span style="color:var(--text)">'+d.sign+'座 '+d.deg+'°</span>'
+        +'<span style="color:var(--muted);font-size:.75rem">第'+d.house+'宫</span>'
+        +note+'</div>';
+    }).join('');
+
+    const halvHtml = nt.halvingEffect
+      ? '<div style="background:rgba(200,100,50,0.15);border:1px solid rgba(200,100,50,0.4);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.85rem;color:#e8a070">🔥 '+nt.halvingEffect+'</div>'
+      : '';
+
+    const jupClass  = nt.jupReturn  ? 'color:#28c870' : 'color:var(--muted)';
+    const satRClass = nt.satReturn  ? 'color:#e04848' : 'color:var(--muted)';
+    const satSClass = nt.satSquare  ? 'color:#e08830' : 'color:var(--muted)';
+
+    panels['natal'] = `
+      <div class="panel">
+        <div class="panel-title" style="justify-content:space-between">
+          <span>☽ 命盘共振分析 · ${nc.name}(${nc.en})</span>
+          <span class="badge ${bc}">${bl}</span>
+        </div>
+
+        <!-- Birth Info Card -->
+        <div style="background:rgba(160,96,224,0.08);border:1px solid rgba(160,96,224,0.25);border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="color:#c090f0;font-size:0.9rem;font-weight:600;margin-bottom:10px;letter-spacing:.05em">📜 出生命盘档案</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+            <div>${pRow('🗓 诞生日期', nc.date+' '+nc.time+' '+nc.tz)}</div>
+            <div>${pRow('📍 诞生地点', nc.location)}</div>
+            <div>${pRow('☉ 太阳星座', nc.sun)}</div>
+            <div>${pRow('↑ 上升星座(西)', nc.asc||'—')}</div>
+            <div>${pRow('♃ 吠陀上升', nc.vedic_asc)}</div>
+            <div>${pRow('🏠 命宫主星', nc.vedic_lord)}</div>
+          </div>
+          <div style="margin-top:10px;padding:8px 12px;background:rgba(160,96,224,0.08);border-radius:8px;font-size:0.8rem;color:var(--muted);line-height:1.7">
+            <b style="color:#c090f0">核心相位：</b>${nc.key_aspects}<br>
+            <b style="color:#c090f0">命盘气质：</b>${nc.char_energy}<br>
+            <b style="color:var(--faint);font-size:.72rem">数据来源：</b><span style="color:var(--faint);font-size:.72rem">${nc.source}</span>
+          </div>
+        </div>
+
+        ${halvHtml}
+
+        <!-- Current Progressions -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+          <div style="background:rgba(40,200,112,0.08);border:1px solid rgba(40,200,112,0.2);border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:1.4rem;margin-bottom:4px">♃</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">木星周期</div>
+            <div style="font-size:0.9rem;color:var(--text)">${nt.jupPhase}% 完成</div>
+            <div style="${jupClass};font-size:0.75rem;margin-top:4px">${nt.jupReturn?'⚡ 木星回归年！':'周期进行中'}</div>
+          </div>
+          <div style="background:rgba(224,72,72,0.08);border:1px solid rgba(224,72,72,0.2);border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:1.4rem;margin-bottom:4px">♄</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">土星周期</div>
+            <div style="font-size:0.9rem;color:var(--text)">${nt.satPhase}% 完成</div>
+            <div style="${nt.satReturn?'color:#e04848':nt.satSquare?'color:#e08830':'color:var(--muted)'};font-size:0.75rem;margin-top:4px">${nt.satReturn?'⚡ 土星回归！':nt.satSquare?'⚠ 土星四分相':'周期进行中'}</div>
+          </div>
+          <div style="background:rgba(200,168,74,0.08);border:1px solid rgba(200,168,74,0.2);border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:1.4rem;margin-bottom:4px">☉</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">推运太阳</div>
+            <div style="font-size:0.9rem;color:var(--text)">${nt.progSunSign}座</div>
+            <div style="color:var(--muted);font-size:0.75rem;margin-top:4px">${nt.progSunDeg}° 弧度</div>
+          </div>
+        </div>
+
+        <!-- Age & Gann Year -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div style="background:rgba(56,168,224,0.08);border:1px solid rgba(56,168,224,0.2);border-radius:10px;padding:14px">
+            <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">🕐 资产寿命</div>
+            <div style="font-size:1.1rem;color:var(--sky)">${nt.ageYears} 年</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:3px">${nt.ageDays} 天 · 第${Math.ceil(nt.ageYears)} 年运程</div>
+          </div>
+          <div style="background:rgba(200,168,74,0.08);border:1px solid rgba(200,168,74,0.2);border-radius:10px;padding:14px">
+            <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px">⬡ 江恩年轮</div>
+            <div style="font-size:1.1rem;color:var(--gold)">${nt.gannYearArc} 单位</div>
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:3px">价格-时间方格能量</div>
+          </div>
+        </div>
+
+        <!-- Planetary positions table -->
+        <div style="background:rgba(12,12,32,0.5);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="color:var(--gold);font-size:0.85rem;font-weight:600;margin-bottom:10px;letter-spacing:.05em">🪐 本命行星分布（出生命盘）</div>
+          ${planetsHtml}
+          <div style="margin-top:10px;padding:8px 10px;background:rgba(160,96,224,0.06);border-radius:6px;font-size:0.78rem;color:var(--muted)">
+            ★ 吠陀月亮星宿：${nc.nakshatra} &nbsp;|&nbsp; 命宫主星：${nc.vedic_lord}
+          </div>
+        </div>
+
+        <!-- Resonance score -->
+        <div style="background:rgba(160,96,224,0.1);border:1px solid rgba(160,96,224,0.3);border-radius:12px;padding:16px">
+          <div style="color:#c090f0;font-size:0.85rem;font-weight:600;margin-bottom:10px">⚡ 命盘共振强度评估</div>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+            <div style="flex:1;height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden">
+              <div style="width:${((nt&&nt.resonance||0)*100).toFixed(0)}%;height:100%;background:linear-gradient(90deg,#6030a0,#c090f0);border-radius:5px"></div>
+            </div>
+            <span style="color:#c090f0;font-size:1.1rem;font-weight:700">${((nt&&nt.resonance||0)*100).toFixed(0)}%</span>
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);line-height:1.8">
+            ${nt.jupReturn?'<span style="color:#28c870">✦ 木星回归：资产扩张周期，历史上重要高点/低点转折频率提升</span><br>':''}
+            ${nt.satReturn?'<span style="color:#e04848">✦ 土星回归：宿命考验期，大幅回调与结构重组多在此窗口</span><br>':''}
+            ${nt.satSquare?'<span style="color:#e08830">✦ 土星四分相：中期压力窗口，趋势阻力增加</span><br>':''}
+            ${nt.halvingEffect?'<span style="color:#e8a070">✦ '+nt.halvingEffect+'</span><br>':''}
+            <span style="color:var(--faint)">命盘共振综合偏向：${nt.bias>0.3?'看多':nt.bias<-0.3?'看空':'中性观望'}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── TP/SL PANEL ──
+  {
+    const T = tpsl;
+    const signalColor = T.signal==='LONG'?'var(--bull)':T.signal==='SHORT'?'var(--bear)':'var(--muted)';
+    const signalIcon  = T.signal==='LONG'?'▲ 做多(LONG)':T.signal==='SHORT'?'▼ 做空(SHORT)':'◆ 观望';
+    const fmtP = v => {
+      const _v = Number(v);
+      if(isNaN(_v)||!isFinite(_v)||_v===0) return '--';
+      if(_v >= 1000) return '$' + Math.round(_v).toLocaleString();
+      if(_v >= 1)    return '$' + _v.toFixed(2);
+      return '$' + _v.toFixed(4);
+    };
+    const pct = (v, ref) => { const _n=Number(v),_r=Number(ref); if(!_r||isNaN(_n)||isNaN(_r))return'0.00'; return ((_n-_r)/_r*100).toFixed(2); };
+
+    // TP rows — direction aware
+    // LONG:  TP is above price (+%), SL is below (−%)
+    // SHORT: TP is below price (price falls = profit, show as −% from entry), SL is above (+%)
+    const tpRows = T.tpLevels.map((tp,i) => {
+      const rawPct  = pct(tp.price, T.P);                          // +ve if above, −ve if below
+      const gainPct = T.isShort
+        ? (((T.P - tp.price) / T.P) * 100).toFixed(2)             // SHORT: profit = drop
+        : rawPct;                                                   // LONG:  profit = rise
+      const barW = Math.min(100, Math.abs(parseFloat(gainPct)) / 30 * 100);
+      return '<div class="tpsl-row tp-row">'
+        + '<div class="tpsl-label"><span class="tpsl-badge tp-badge">TP'+(i+1)+(T.isShort?' 空':' 多')+'</span>'
+        + '<span class="tpsl-source">'+tp.source+'</span></div>'
+        + '<div class="tpsl-price">'+fmtP(tp.price)
+          + '<span class="tpsl-pct tp-pct">+'+ gainPct +'%</span></div>'
+        + '<div class="tpsl-rrr">RRR <strong>'+tp.rrr+'R</strong></div>'
+        + '<div class="tpsl-bar-wrap"><div class="tpsl-bar tp-bar" style="width:'+Math.max(4,barW)+'%"></div></div>'
+        + '</div>';
+    }).join('');
+
+    // SL rows — direction aware
+    // LONG:  SL is below price (loss if price drops)
+    // SHORT: SL is above price (loss if price rises)
+    const slRows = T.slLevels.map((sl,i) => {
+      const rawPct  = pct(sl.price, T.P);
+      const lossPct = T.isShort
+        ? (((sl.price - T.P) / T.P) * 100).toFixed(2)             // SHORT: loss = rise
+        : Math.abs(rawPct).toFixed(2);                             // LONG:  loss = drop
+      const barW = Math.min(100, parseFloat(lossPct) / 20 * 100);
+      return '<div class="tpsl-row sl-row">'
+        + '<div class="tpsl-label"><span class="tpsl-badge sl-badge">SL'+(i+1)+(T.isShort?' 空':' 多')+'</span>'
+        + '<span class="tpsl-source">'+sl.source+'</span></div>'
+        + '<div class="tpsl-price">'+fmtP(sl.price)
+          + '<span class="tpsl-pct sl-pct">−'+ lossPct +'%</span></div>'
+        + '<div class="tpsl-rrr"><span style="color:var(--muted);font-size:.78rem">风险</span> <strong>'+fmtP(T.risk)+'</strong></div>'
+        + '<div class="tpsl-bar-wrap"><div class="tpsl-bar sl-bar" style="width:'+Math.max(4,barW)+'%"></div></div>'
+        + '</div>';
+    }).join('');
+
+  if(sys.ziwei && zw) {
+    panels['ziwei'] = buildZiweiPanel(zw, coin);
+  }
+
+  if(sys.volRate && va) {
+    panels['volrate'] = buildVideoAlgoPanel(va, coin, price);
+  }
+
+  // ── 技术指标面板 (RSI + MACD + Bollinger + TD) ──
+  {
+    const currentTFpanel = document.getElementById('fetchPeriod')?.value || '4h';
+    panels['techind'] = buildRSIPanel(rsiE, macdE, bbE, tdE, tfRec, mtfE);
+  }
+
+    panels['tpsl'] = `
+      <div class="panel">
+        <div class="panel-title" style="justify-content:space-between">
+          <span>🎯 止盈止损</span>
+          <span style="font-size:.85rem;font-weight:800;color:${signalColor}">${signalIcon}</span>
+        </div>
+
+        ${data._priceWarning ? `
+        <div style="margin-bottom:12px;padding:10px 12px;background:rgba(168,32,32,.08);border:1px solid rgba(168,32,32,.3);border-radius:9px;font-size:.75rem;color:var(--bear);line-height:1.6">
+          ${data._priceWarning}
+        </div>` : ''}
+
+        ${(()=>{
+          const T = tpsl;
+          if(!T) return '<div style="color:var(--faint);font-size:.8rem;padding:12px 0">请先运行推演</div>';
+          const fmtV = v => { const n=Number(v); if(!n||isNaN(n))return'--'; return n>=1000?'$'+Math.round(n).toLocaleString():n>=1?'$'+n.toFixed(2):'$'+n.toFixed(4); };
+          const pctStr = (a,b) => Math.abs(((a-b)/b)*100).toFixed(1)+'%';
+          const tp1=T.tpLevels?.[0], tp2=T.tpLevels?.[1], tp3=T.tpLevels?.[2];
+          const sl1=T.slLevels?.[0];
+          const isLong = T.signal !== 'SHORT';
+          const entryColor = 'var(--text)';
+          const tpColor  = isLong ? 'var(--bull)' : 'var(--bear)';
+          const slColor  = 'var(--bear)';
+
+          // 5档江恩止盈（tpsl5）
+          const gann5 = tpsl5?.strategies?.[0];
+
+          const rows = [
+            // 进场
+            { label:'进场', val: fmtV(T.P), sub: T.atrPct+'% ATR · '+T.volatilityLabel, color: entryColor, icon:'◆' },
+            // TP1-TP3
+            ...(tp1 ? [{ label:'TP1', val: fmtV(tp1.price), sub: (isLong?'+':'-')+pctStr(tp1.price,T.P)+' · '+tp1.rrr+'R', color: tpColor, icon:'▲' }] : []),
+            ...(tp2 ? [{ label:'TP2', val: fmtV(tp2.price), sub: (isLong?'+':'-')+pctStr(tp2.price,T.P)+' · '+tp2.rrr+'R', color: tpColor, icon:'▲' }] : []),
+            ...(tp3 ? [{ label:'TP3', val: fmtV(tp3.price), sub: (isLong?'+':'-')+pctStr(tp3.price,T.P)+' · '+tp3.rrr+'R', color: tpColor+'99', icon:'▲' }] : []),
+            // SL
+            ...(sl1 ? [{ label:'止损', val: fmtV(sl1.price), sub: '-'+pctStr(sl1.price,T.P), color: slColor, icon:'▼' }] : []),
+          ];
+
+          const rowsHtml = rows.map(r => `
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:.7rem;font-weight:700;color:${r.color==='var(--text)'?'var(--faint)':r.color};width:32px;flex-shrink:0">${r.label}</span>
+              <span style="font-size:.92rem;font-weight:800;font-family:monospace;color:${r.color};flex:1">${r.val}</span>
+              <span style="font-size:.68rem;color:var(--muted)">${r.sub}</span>
+            </div>`).join('');
+
+          // 江恩5档摘要
+          const gannHtml = gann5 ? `
+            <div style="margin-top:12px;padding:10px 12px;border:1px solid rgba(140,100,16,.2);border-radius:9px;background:rgba(140,100,16,.03)">
+              <div style="font-size:.62rem;font-weight:700;color:var(--gold);margin-bottom:7px;letter-spacing:.05em">⬡ 江恩九方格 · 五档位</div>
+              ${tpsl5.strategies.map((s,i)=>{
+                const lo=s.long, sh=s.short;
+                const colors=['#3ab8c8','#28c870','#c8a840','#e8a040','#e05050'];
+                const c = colors[i];
+                return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.04)">
+                  <span style="font-size:.6rem;font-weight:700;color:${c};width:50px;flex-shrink:0">${s.label}</span>
+                  <span style="font-size:.68rem;color:var(--bull);font-family:monospace">${fmtV(lo.tp)}</span>
+                  <span style="font-size:.58rem;color:var(--faint)">+${lo.tpPct}%</span>
+                  <span style="font-size:.6rem;color:var(--faint);margin:0 2px">/</span>
+                  <span style="font-size:.68rem;color:var(--bear);font-family:monospace">${fmtV(lo.sl)}</span>
+                  <span style="font-size:.58rem;color:var(--faint);margin-left:auto">RRR ${lo.rrr}</span>
+                </div>`;
+              }).join('')}
+            </div>` : '';
+
+          // 入场区间
+          const entryHtml = T.entryZone ? `
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:rgba(140,100,16,.05);border-radius:8px;border:1px solid rgba(140,100,16,.18)">
+              <span style="font-size:.68rem;color:var(--muted)">建议入场区间</span>
+              <span style="flex:1;font-size:.82rem;font-weight:700;font-family:monospace;color:var(--gold)">${fmtV(T.entryZone.low)} — ${fmtV(T.entryZone.high)}</span>
+              <span style="font-size:.65rem;color:var(--muted)">仓位 ${T.positionSize?.percentage||'--'}</span>
+            </div>` : '';
+
+          return `<div>${rowsHtml}${entryHtml}${gannHtml}</div>`;
+        })()}
+      </div>`
+    // ── 🔬 回测验证面板 ──
+    panels['backtest'] = buildBacktestPanel(coin, price, high, low, nodes, tpsl, sys);
+  }
+
+  const content = document.getElementById('tabContent');
+  content.innerHTML = '';
+  tabDefs.forEach((t,i) => {
+    const div = document.createElement('div');
+    div.className = 'tab-panel' + (i===0?' active':'');
+    div.id = 'tp-'+t.id;
+    if(typeof panels[t.id] === 'string') div.innerHTML = panels[t.id];
+    else if(panels[t.id]) div.appendChild(panels[t.id]);
+    content.appendChild(div);
+  });
+}
+
+
+
+function setPosTP(val) {
+  const el = document.getElementById('pos-tp');
+  if (el) { el.value = val; calcPosition(); }
+}
+
+// ═══════════════════════════════════════════════
+// POSITION CALCULATOR
+// ═══════════════════════════════════════════════
+function calcPosition() {
+  const balance = parseFloat(document.getElementById('pos-balance')?.value) || 10000;
+  const riskPct = parseFloat(document.getElementById('pos-risk')?.value) || 2;
+  const entry   = parseFloat(document.getElementById('pos-entry')?.value) || 0;
+  const sl      = parseFloat(document.getElementById('pos-sl')?.value) || 0;
+  const tp      = parseFloat(document.getElementById('pos-tp')?.value) || 0;
+
+  const resultEl = document.getElementById('pos-result');
+  const batchEl  = document.getElementById('pos-batch');
+  if(!resultEl) return;
+
+  if(!entry || !sl || sl >= entry) {
+    resultEl.innerHTML = '<div style="grid-column:1/-1;font-size:.75rem;color:var(--faint);text-align:center;padding:16px">请填写有效的入场价和止损价（止损须低于入场价）</div>';
+    return;
+  }
+
+  const maxLoss    = balance * riskPct / 100;
+  const slDist     = entry - sl;
+  const slPct      = (slDist / entry * 100).toFixed(2);
+  const posSize    = maxLoss / slDist;          // 单位数量
+  const posValue   = posSize * entry;           // 仓位市值 USDT
+  const posRatio   = (posValue / balance * 100).toFixed(1); // 占账户%
+  const leverage   = Math.ceil(posValue / balance);
+
+  const tpDist  = tp > entry ? tp - entry : 0;
+  const rrr     = tpDist > 0 ? (tpDist / (slDist||1)).toFixed(2) : '--';
+  const profit  = tpDist > 0 ? ((posSize||0) * (tpDist||0)).toFixed(2) : '--';
+
+  const fmtMoney = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():'$'+_n.toFixed(2); };
+  const fmtCoin  = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'0'; return _n>=1?_n.toFixed(4):_n.toFixed(6); };
+
+  const cards = [
+    { label:'建议仓位数量', val: fmtCoin(posSize), sub:'个单位', color:'var(--text)' },
+    { label:'仓位市值', val: fmtMoney(posValue), sub: posRatio+'% 账户', color:'var(--gold)' },
+    { label:'最大亏损额', val: fmtMoney(maxLoss), sub: riskPct+'% 账户', color:'var(--bear)' },
+    { label:'止损距离', val: slPct+'%', sub: fmtMoney(slDist)+' / 单位', color:'var(--amber)' },
+    { label:'预期盈利', val: profit !== '--' ? fmtMoney(profit) : '--', sub: 'TP目标兑现', color:'var(--bull)' },
+    { label:'盈亏比 RRR', val: rrr, sub: rrr !== '--' && parseFloat(rrr) >= 2 ? '✓ 达标' : rrr !== '--' ? '⚠ 偏低' : '--', color: rrr !== '--' && parseFloat(rrr) >= 2 ? 'var(--bull)' : 'var(--amber)' },
+  ];
+
+  resultEl.innerHTML = cards.map(c =>
+    '<div style="background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:12px 14px">'
+    + '<div style="font-size:.6rem;color:var(--muted);margin-bottom:4px">'+c.label+'</div>'
+    + '<div style="font-size:1rem;font-weight:700;color:'+c.color+'">'+c.val+'</div>'
+    + '<div style="font-size:.6rem;color:var(--faint);margin-top:2px">'+c.sub+'</div>'
+    + '</div>'
+  ).join('');
+
+  // Batch entry suggestion (3 tranches)
+  const tranche1 = posSize * 0.4, tranche2 = posSize * 0.35, tranche3 = posSize * 0.25;
+  const price1 = entry, price2 = entry * 0.995, price3 = sl * 1.015;
+  batchEl.innerHTML = '<div style="background:rgba(200,168,74,0.06);border:1px solid rgba(200,168,74,0.18);border-radius:9px;padding:12px 14px">'
+    + '<div style="font-size:.65rem;font-weight:700;color:var(--gold);margin-bottom:8px">📋 建议分批入场</div>'
+    + '<div style="display:flex;flex-direction:column;gap:5px">'
+    + [
+        ['第一批 40%', fmtCoin(tranche1), fmtMoney(tranche1*entry), price1, '立即入场'],
+        ['第二批 35%', fmtCoin(tranche2), fmtMoney(tranche2*price2), price2, '回调补仓'],
+        ['第三批 25%', fmtCoin(tranche3), fmtMoney(tranche3*price3), price3, '近止损加仓'],
+      ].map(([label, qty, val, px, note]) =>
+        '<div style="display:grid;grid-template-columns:80px 80px 80px 1fr auto;align-items:center;gap:8px;font-size:.65rem;padding:5px 8px;background:rgba(0,0,0,0.05);border-radius:6px">'
+        + '<span style="font-weight:700;color:var(--gold)">'+label+'</span>'
+        + '<span style="color:var(--text)">'+qty+'</span>'
+        + '<span style="color:var(--muted)">'+val+'</span>'
+        + '<span style="color:var(--faint)">@ $'+Math.round(px).toLocaleString()+'</span>'
+        + '<span style="color:var(--faint)">'+note+'</span>'
+        + '</div>'
+      ).join('')
+    + '</div></div>';
+}
+
+// ═══════════════════════════════════════════════
+// TAB SWITCH
+// ═══════════════════════════════════════════════
+function switchDetailTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const panel = document.getElementById('tp-'+id);
+  if(panel) panel.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+// AUTO FETCH PRICE FROM BINANCE (无需token)
+// ═══════════════════════════════════════════════
 
 const SYMBOL_TO_COIN = {
   BTCUSDT:'BTC', ETHUSDT:'ETH', SOLUSDT:'SOL', BNBUSDT:'BNB',
@@ -13217,15 +14996,3 @@ ${tpLines.join('\n')}
 }
 
 console.log('✅ 行情说明弹窗就绪');
-
-/* ── renderCoinCards sync hook ── */
-window.addEventListener('load', function() {
-  var _origRCT = typeof renderCoinTable !== 'undefined' ? renderCoinTable : null;
-  if (typeof _origRCT === 'function') {
-    window.renderCoinTable = function() {
-      _origRCT.apply(this, arguments);
-      try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_) {}
-    };
-  }
-  try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_) {}
-});
