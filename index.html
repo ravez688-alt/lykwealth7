@@ -3,35 +3,573 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>天機數元 · 玄学推演系统</title>
-    
-    <!-- 你的原有CSS（稍作手机适配） -->
-    <link rel="stylesheet" href="./css/style.css">
-    
-    <!-- 手机专用调试（只在手机显示） -->
-    <script>
-        if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            // 加载vConsole用于调试
-            var script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/vconsole@3.15.1/dist/vconsole.min.js';
-            script.onload = function() {
-                var vConsole = new VConsole();
-                console.log('📱 玄学系统手机调试模式');
-            };
-            document.head.appendChild(script);
+    <title>天機數元 · 玄机阁</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-    </script>
+        
+        body {
+            background: #0a0c14;
+            background-image: radial-gradient(circle at 10% 20%, rgba(255, 215, 0, 0.03) 0%, transparent 30%),
+                              linear-gradient(135deg, #0a0c14 0%, #141b2b 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            color: #e6eaf2;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+        }
+        
+        /* 装饰性太极线 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(45deg, rgba(255,215,0,0.02) 0px, rgba(255,215,0,0.02) 2px, transparent 2px, transparent 8px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* 顶部状态栏 - 道教符箓风格 */
+        .status-bar {
+            background: rgba(20, 30, 45, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 40px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .status-bar::after {
+            content: '⚲';
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            color: rgba(255,215,0,0.2);
+            font-size: 30px;
+            transform: rotate(45deg);
+            font-family: serif;
+        }
+        
+        .fear-greed {
+            color: #ffaa5e;
+            background: rgba(255, 170, 94, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border-left: 2px solid #ffaa5e;
+        }
+        
+        .btc-fee {
+            color: #ff7b7b;
+            background: rgba(255, 123, 123, 0.1);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border-left: 2px solid #ff7b7b;
+        }
+        
+        .update-time {
+            color: #8e9bb3;
+            font-family: monospace;
+        }
+        
+        /* 四象卡片 - 易经四象 */
+        .four-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .card {
+            background: rgba(26, 34, 50, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border-radius: 24px;
+            padding: 20px 15px;
+            border: 1px solid rgba(255, 215, 0, 0.15);
+            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 215, 0, 0.4);
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ffd700, transparent);
+        }
+        
+        #card-up::before { background: linear-gradient(90deg, #4caf50, transparent); }
+        #card-down::before { background: linear-gradient(90deg, #f44336, transparent); }
+        #card-alert::before { background: linear-gradient(90deg, #ff9800, transparent); }
+        #card-opp::before { background: linear-gradient(90deg, #9c27b0, transparent); }
+        
+        .card-label {
+            font-size: 14px;
+            color: #a0b3d9;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+        }
+        
+        .card-number {
+            font-size: 42px;
+            font-weight: 700;
+            color: #ffd700;
+            text-shadow: 0 0 15px rgba(255,215,0,0.3);
+            line-height: 1;
+            margin-bottom: 5px;
+            font-family: 'Times New Roman', serif;
+        }
+        
+        .card-sub {
+            font-size: 12px;
+            color: #6b7a99;
+        }
+        
+        /* 信号阶段 - 八卦样式 */
+        .signal-phases {
+            background: rgba(10, 15, 25, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 50px;
+            padding: 8px;
+            margin-bottom: 25px;
+            display: flex;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        .phase {
+            flex: 1;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 14px;
+            color: #8e9bb3;
+            border-radius: 40px;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .phase.active {
+            background: rgba(255, 215, 0, 0.15);
+            color: #ffd700;
+            box-shadow: 0 0 10px rgba(255,215,0,0.2);
+        }
+        
+        .phase.active::after {
+            content: '●';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 8px;
+            color: #ffd700;
+        }
+        
+        /* 主标题 - 篆刻风格 */
+        .main-title {
+            text-align: center;
+            font-size: 42px;
+            font-weight: 300;
+            letter-spacing: 12px;
+            margin: 30px 0;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5),
+                         3px 3px 0 rgba(0,0,0,0.5);
+            font-family: 'Times New Roman', 'Songti SC', serif;
+            position: relative;
+        }
+        
+        .main-title::before,
+        .main-title::after {
+            content: '☯';
+            font-size: 24px;
+            color: rgba(255,215,0,0.3);
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .main-title::before { left: 0; }
+        .main-title::after { right: 0; }
+        
+        /* 推演区域 - 阴阳布局 */
+        .yanji-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(20, 28, 40, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 20px;
+            border: 1px solid rgba(255,215,0,0.1);
+        }
+        
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px dashed rgba(255,215,0,0.2);
+            padding-right: 15px;
+        }
+        
+        .yanji-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ffd700, #b8860b);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #0a0c14;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(255,215,0,0.5);
+            transition: all 0.3s;
+            animation: pulse 3s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255,215,0,0.5); }
+            50% { box-shadow: 0 0 50px rgba(255,215,0,0.8); }
+        }
+        
+        .yanji-button .symbol {
+            font-size: 24px;
+        }
+        
+        .yanji-button .text {
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .yanji-button:active {
+            transform: scale(0.95);
+        }
+        
+        .right-panel {
+            flex: 3;
+        }
+        
+        .result-list {
+            min-height: 150px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .result-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid;
+            transition: all 0.2s;
+        }
+        
+        .result-item:hover {
+            background: rgba(255,215,0,0.1);
+            transform: translateX(5px);
+        }
+        
+        .result-item.up { border-left-color: #4caf50; }
+        .result-item.down { border-left-color: #f44336; }
+        
+        .coin-name {
+            font-weight: 600;
+            color: #ffd700;
+        }
+        
+        .coin-price {
+            font-family: monospace;
+            font-size: 16px;
+        }
+        
+        .coin-change.up { color: #4caf50; }
+        .coin-change.down { color: #f44336; }
+        
+        .coin-signal {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .hint {
+            text-align: center;
+            color: #5a6a85;
+            font-size: 13px;
+            padding: 30px 0;
+            line-height: 1.8;
+            border: 1px dashed rgba(255,215,0,0.2);
+            border-radius: 20px;
+        }
+        
+        .hint-small {
+            font-size: 12px;
+            color: #3e4a5f;
+        }
+        
+        .network-hint {
+            background: rgba(255, 170, 94, 0.1);
+            border-radius: 16px;
+            padding: 12px 15px;
+            margin: 20px 0;
+            border-left: 4px solid #ffaa5e;
+            font-size: 13px;
+            color: #ffaa5e;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .network-hint::before {
+            content: '⚠️';
+            font-size: 16px;
+        }
+        
+        /* 底部导航 - 罗盘样式 */
+        .bottom-nav {
+            background: rgba(26, 34, 50, 0.8);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 40px;
+            padding: 12px;
+            margin: 30px 0 20px;
+            display: flex;
+            justify-content: space-around;
+            border: 1px solid rgba(255,215,0,0.2);
+            position: relative;
+        }
+        
+        .bottom-nav::before {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            background: #ffd700;
+            border-radius: 50%;
+            filter: blur(15px);
+            opacity: 0.3;
+        }
+        
+        .nav-item {
+            text-align: center;
+            font-size: 14px;
+            color: #8e9bb3;
+            padding: 5px 15px;
+            border-radius: 30px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .nav-item.active {
+            background: rgba(255,215,0,0.15);
+            color: #ffd700;
+        }
+        
+        /* 玄学权重区域 - 五行样式 */
+        .xuanxue-section {
+            background: rgba(20, 28, 40, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 1px solid rgba(255,215,0,0.1);
+        }
+        
+        .xuanxue-section h3 {
+            color: #ffd700;
+            font-size: 18px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .xuanxue-section h3::before {
+            content: '⚲';
+            font-size: 20px;
+            color: #ffd700;
+        }
+        
+        .weights {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .weight-item {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid rgba(255,215,0,0.1);
+        }
+        
+        .weight-name {
+            font-size: 14px;
+            color: #a0b3d9;
+            display: block;
+            margin-bottom: 10px;
+        }
+        
+        .weight-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffd700;
+            font-family: 'Times New Roman', serif;
+        }
+        
+        .weight-status {
+            font-size: 12px;
+            color: #ffaa5e;
+            margin-left: 10px;
+        }
+        
+        .weight-bar {
+            height: 4px;
+            background: rgba(255,215,0,0.2);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .weight-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            border-radius: 2px;
+            width: 0%;
+        }
+        
+        /* 历史回测区域 */
+        .history-section {
+            background: rgba(20, 28, 40, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 20px;
+            margin: 25px 0;
+            border: 1px solid rgba(255,215,0,0.1);
+        }
+        
+        .history-section h3 {
+            color: #ffd700;
+            font-size: 18px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+        
+        .history-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .history-controls input,
+        .history-controls select,
+        .history-controls button {
+            flex: 1 1 auto;
+            padding: 12px 15px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,215,0,0.2);
+            border-radius: 16px;
+            color: #e6eaf2;
+            font-size: 14px;
+        }
+        
+        .history-controls button {
+            background: rgba(255,215,0,0.2);
+            color: #ffd700;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 80px;
+        }
+        
+        .history-controls button:active {
+            background: rgba(255,215,0,0.3);
+            transform: scale(0.98);
+        }
+        
+        .history-records {
+            background: rgba(0,0,0,0.3);
+            border-radius: 16px;
+            padding: 15px;
+            font-size: 13px;
+            color: #8e9bb3;
+            text-align: center;
+            border: 1px dashed rgba(255,215,0,0.2);
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255,215,0,0.05);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,215,0,0.3);
+            border-radius: 2px;
+        }
+    </style>
 </head>
 <body>
-    <div class="container" id="app">
-        <!-- ===== 顶部状态 ===== 保留你的原有布局 -->
+    <div class="container">
+        <!-- 顶部状态栏 -->
         <div class="status-bar">
-            <div class="fear-greed">恐惧贪婪 23 · 极度恐惧</div>
-            <div class="btc-fee">BTC费率 -0.4293% · 负费率</div>
-            <div class="update-time">更新 2026/03/19 08:41:44</div>
+            <span class="fear-greed">恐惧贪婪 23 · 极度恐惧</span>
+            <span class="btc-fee">BTC费率 -0.4293% · 负费率</span>
+            <span class="update-time">更新 2026/03/19 08:41:44</span>
         </div>
         
-        <!-- ===== 四象卡片 ===== 你的上涨/下跌趋势等 -->
+        <!-- 四象卡片 -->
         <div class="four-cards">
             <div class="card" id="card-up">
                 <div class="card-label">上涨趋势</div>
@@ -55,7 +593,7 @@
             </div>
         </div>
         
-        <!-- ===== 信号阶段 ===== 你的全部/已入场等 -->
+        <!-- 信号阶段 -->
         <div class="signal-phases">
             <span class="phase active">全部</span>
             <span class="phase">已入场</span>
@@ -64,10 +602,10 @@
             <span class="phase">已出局</span>
         </div>
         
-        <!-- ===== 主标题 ===== 天機數元 -->
+        <!-- 主标题 -->
         <h1 class="main-title">天機數元</h1>
         
-        <!-- ===== 推演按钮 ===== 点击左侧全部推演 -->
+        <!-- 推演区域 -->
         <div class="yanji-container">
             <div class="left-panel">
                 <div class="yanji-button" id="startYanji">
@@ -76,66 +614,72 @@
                 </div>
             </div>
             <div class="right-panel">
-                <!-- 右侧显示推演结果列表 -->
                 <div class="result-list" id="resultList">
-                    <div class="hint">点击左侧 ✦ 全部推演 开始</div>
-                    <div class="hint-small">系统自动抓取价格并运行十法合一推演</div>
-                    <div class="hint-small">推演完成后数据显示在此列表</div>
+                    <div class="hint">
+                        点击左侧 ✦ 全部推演 开始<br>
+                        <span class="hint-small">系统自动抓取价格并运行十法合一推演</span><br>
+                        <span class="hint-small">推演完成后数据显示在此列表</span>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- ===== 网络受限提示 ===== 你的原有提示 -->
+        <!-- 网络受限提示 -->
         <div class="network-hint">
-            💡 网络受限时点击列表中币种 → 手动输入价格 → 运行推演
+            网络受限时点击列表中币种 → 手动输入价格 → 运行推演
         </div>
         
-        <!-- ===== 底部导航 ===== 仪表盘/误差校正/设置 -->
+        <!-- 底部导航 -->
         <div class="bottom-nav">
-            <div class="nav-item active">仪表盘</div>
-            <div class="nav-item">误差校正</div>
-            <div class="nav-item">设置</div>
+            <span class="nav-item active">仪表盘</span>
+            <span class="nav-item">误差校正</span>
+            <span class="nav-item">设置</span>
         </div>
         
-        <!-- ===== 玄学参数区域 ===== 江恩/缠论/支阻/谐波 -->
+        <!-- 玄学权重区域 -->
         <div class="xuanxue-section">
             <h3>模型权重（自动优化）</h3>
             <div class="weights">
                 <div class="weight-item">
                     <span class="weight-name">江恩</span>
-                    <span class="weight-value" id="gannWeight">40%</span>
+                    <span class="weight-value">40%</span>
                     <span class="weight-status">待积累</span>
+                    <div class="weight-bar"><div class="weight-progress" style="width:40%"></div></div>
                 </div>
                 <div class="weight-item">
                     <span class="weight-name">缠论</span>
-                    <span class="weight-value" id="chanWeight">25%</span>
+                    <span class="weight-value">25%</span>
                     <span class="weight-status">待积累</span>
+                    <div class="weight-bar"><div class="weight-progress" style="width:25%"></div></div>
                 </div>
                 <div class="weight-item">
                     <span class="weight-name">支阻</span>
-                    <span class="weight-value" id="supportWeight">20%</span>
+                    <span class="weight-value">20%</span>
                     <span class="weight-status">待积累</span>
+                    <div class="weight-bar"><div class="weight-progress" style="width:20%"></div></div>
                 </div>
                 <div class="weight-item">
                     <span class="weight-name">谐波</span>
-                    <span class="weight-value" id="harmonicWeight">15%</span>
+                    <span class="weight-value">15%</span>
                     <span class="weight-status">待积累</span>
+                    <div class="weight-bar"><div class="weight-progress" style="width:15%"></div></div>
                 </div>
             </div>
         </div>
         
-        <!-- ===== 历史回测区域 ===== -->
+        <!-- 历史回测区域 -->
         <div class="history-section">
             <h3>📅 批量历史回测</h3>
             <div class="history-controls">
-                <input type="date" id="startDate" placeholder="开始日期">
-                <input type="date" id="endDate" placeholder="结束日期">
-                <select id="backtestCoin">
-                    <option value="XAU">XAU 黄金</option>
-                    <option value="BTC">BTC 比特币</option>
-                    <option value="ETH">ETH 以太坊</option>
+                <input type="text" placeholder="开始日期 mm/dd/yyyy" value="03/19/2026">
+                <input type="text" placeholder="结束日期 mm/dd/yyyy" value="03/19/2026">
+                <select>
+                    <option>XAU 黄金</option>
+                    <option>BTC 比特币</option>
+                    <option>ETH 以太坊</option>
+                    <option>SOL 索拉纳</option>
                 </select>
-                <button id="runBacktest">回测</button>
+                <button>回测</button>
             </div>
             <div class="history-records" id="historyRecords">
                 0条记录 · 推演历史日期后自动积累
@@ -143,9 +687,44 @@
         </div>
     </div>
     
-    <!-- ===== 加载所有JS ===== 保留你的原有逻辑，但用我重写的数据层 -->
-    <script src="./js/xuanxue.js"></script>  <!-- 你的玄学算法 -->
-    <script src="./js/data.js"></script>     <!-- 我的数据层 -->
-    <script src="./js/app.js"></script>       <!-- 你的主逻辑 -->
+    <script>
+        // 示例数据（用于演示UI效果）
+        document.addEventListener('DOMContentLoaded', function() {
+            // 模拟数据
+            setTimeout(() => {
+                const listEl = document.getElementById('resultList');
+                listEl.innerHTML = `
+                    <div class="result-item up">
+                        <div><span class="coin-name">XAU 黄金</span></div>
+                        <div><span class="coin-price">$2925.43</span></div>
+                        <div><span class="coin-change up">↑ 0.35%</span></div>
+                        <div><span class="coin-signal">观察池</span></div>
+                    </div>
+                    <div class="result-item down">
+                        <div><span class="coin-name">XAG 白银</span></div>
+                        <div><span class="coin-price">$24.68</span></div>
+                        <div><span class="coin-change down">↓ 0.12%</span></div>
+                        <div><span class="coin-signal">预备池</span></div>
+                    </div>
+                    <div class="result-item up">
+                        <div><span class="coin-name">BTC 比特币</span></div>
+                        <div><span class="coin-price">$63,452</span></div>
+                        <div><span class="coin-change up">↑ 1.25%</span></div>
+                        <div><span class="coin-signal">已入场</span></div>
+                    </div>
+                `;
+                
+                document.getElementById('upCount').textContent = '2';
+                document.getElementById('downCount').textContent = '1';
+                document.getElementById('alertCount').textContent = '3';
+                document.getElementById('oppCount').textContent = '1';
+            }, 1000);
+            
+            // 按钮点击事件
+            document.getElementById('startYanji').addEventListener('click', function() {
+                alert('✨ 十法合一推演启动');
+            });
+        });
+    </script>
 </body>
 </html>
