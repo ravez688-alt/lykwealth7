@@ -1,6 +1,15 @@
 // xuanxue.js — 天機數元 · 完整系统
 // 包含：玄学引擎 + UI逻辑 + 仪表盘 + 推演流程
 
+// Restore saved theme on load (default: light)
+(function(){
+  try {
+    var t = localStorage.getItem('xuanxue_theme') || localStorage.getItem('tianjishu-theme');
+    if (t) document.documentElement.setAttribute('data-theme', t);
+    // else: HTML already has data-theme=light as default
+  } catch(_) {}
+})();
+
 
 
 // ═══════════════════════════════════════════════
@@ -8387,10 +8396,11 @@ function getSys() {
 }
 
 function toggleTheme() {
-  const html = document.documentElement;
-  const isDark = html.getAttribute('data-theme') === 'dark';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  localStorage.setItem('tianjishu-theme', isDark ? 'light' : 'dark');
+  const h = document.documentElement;
+  const isDark = h.getAttribute('data-theme') === 'dark';
+  const newTheme = isDark ? 'light' : 'dark';
+  h.setAttribute('data-theme', newTheme);
+  try { localStorage.setItem('xuanxue_theme', newTheme); } catch(_) {}
 }
 
 // ── PC-only: no tab switching needed ──────────────────────────
@@ -15891,7 +15901,7 @@ const QiMen = (() => {
   ];
 
   // 九星（坎→乾顺序）
-  const STARS = ['天蓬','天芮','天冲','天辅','天禽','天心','天柱','天任','天英'];
+  const _STARS = ['天蓬','天芮','天冲','天辅','天禽','天心','天柱','天任','天英'];
   // 八门（坎→乾顺序，中宫5无门）
   const DOORS  = ['休门','死门','伤门','杜门','','开门','惊门','生门','景门'];
   // 八神
@@ -15934,14 +15944,14 @@ const QiMen = (() => {
     for (let i = 0; i < 9; i++) {
       const gong = ((juPos + i) % 8);
       const gongNum = seq[gong] || (i + 1);
-      starMap[gongNum] = STARS[i];
+      starMap[gongNum] = _STARS[i];
       if (DOORS[i]) doorMap[gongNum] = DOORS[i];
     }
 
     // 时家：shi影响值符宫偏移
     const timeOffset = (juPos + shi) % 8;
     const timeGong   = seq[timeOffset] || ju;
-    const timeStar   = starMap[timeGong] || STARS[0];
+    const timeStar   = starMap[timeGong] || _STARS[0];
     const timeDoor   = doorMap[timeGong] || '';
     // 八神按时辰顺序排
     for (let i = 0; i < 8; i++) {
