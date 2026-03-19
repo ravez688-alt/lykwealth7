@@ -8225,7 +8225,7 @@ async function runDashboard() {
     try { if (typeof renderCoinCards==='function') renderCoinCards(); } catch(_e) {}
     // Force welcome hidden after full render
     const _fw = document.getElementById('dbWelcome');
-    if (_fw) _fw.style.display = 'none';
+    if (_fw) _fw.classList.add('hidden');
     if (scanBar) scanBar.style.display = 'none';
 
     // ── 历史模式：自动验证误差 ────────────────────────────────────────────
@@ -11376,7 +11376,7 @@ window.addEventListener('error', function(e) {
   }
   // Show error in welcome area
   const welcome = document.getElementById('dbWelcome');
-  if (welcome && welcome.style.display !== 'none') {
+  if (welcome && !welcome.classList.contains('hidden')) {
     const errDiv = document.getElementById('_errNotice') || document.createElement('div');
     errDiv.id = '_errNotice';
     errDiv.style.cssText = 'margin:12px;padding:10px 14px;background:rgba(184,40,40,.1);border:1px solid rgba(184,40,40,.3);border-radius:8px;font-size:.72rem;color:#b82828;line-height:1.7';
@@ -11477,16 +11477,16 @@ function renderCoinTable() {
 
   const hasAny = dashCoins.some(c => dashResults[c.coin] && dashResults[c.coin] !== 'loading');
   if (!hasAny) {
-    if (welcome) welcome.style.display = '';   // CSS default (flex)
+    if (welcome) welcome.classList.remove('hidden');   // CSS default (flex)
     tblEl.style.display = 'none';
     const cardList = document.getElementById('coinCardList');
     if (cardList) cardList.innerHTML = '';     // empty → CSS :empty hides it
     return;
   }
-  if (welcome) welcome.style.display = 'none';
+  if (welcome) welcome.classList.add('hidden');
   if (welcome) welcome.style.flex = '0';  // remove from flex flow so table fills space
   // Desktop: show table and hide welcome
-  if (welcome) welcome.style.display = 'none';
+  if (welcome) welcome.classList.add('hidden');
   tblEl.style.display = 'table';
   // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
@@ -13160,12 +13160,12 @@ function renderCoinCards() {
   if (!hasAny) {
     listEl.innerHTML = '';
     listEl.style.display = 'none';
-    if (welcome) { welcome.style.display = ''; welcome.style.flex = '1'; }
+    if (welcome) { welcome.classList.remove('hidden'); }
     return;
   }
 
   // Have data: hide welcome, FORCE card list visible
-  if (welcome) { welcome.style.display = 'none'; welcome.style.flex = '0'; }
+  if (welcome) { welcome.classList.add('hidden'); }
   listEl.style.setProperty('display','block','important');
   listEl.style.padding = '8px 12px 90px';
 
