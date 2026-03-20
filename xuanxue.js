@@ -57,6 +57,101 @@
     return '$' + window._safeFixed(n, 6);
   };
 })();
+// ══════════════════════════════════════════════════════════
+// KV 云同步模块 — 学习数据跨设备同步
+// 读写优先走 Cloudflare KV，本地 localStorage 作备份
+// ══════════════════════════════════════════════════════════
+const _KV = (() => {
+  const WORKER = 'https://binance-proxy.ravez0807.workers.dev';
+  const SYNC_KEYS = ['custom_engine_weights','err_price','err_time','err_weights','err_stats','simple_weights','price_errors','time_errors'];
+  let _cache = {};  // in-memory cache to avoid redundant requests
+
+  async function get(key, fallback) {
+    // Check memory cache first
+    if (_cache[key] !== undefined) return _cache[key];
+    try {
+      const r = await fetch(`${WORKER}/kv?key=${encodeURIComponent(key)}`);
+      if (r.ok) {
+        const d = await r.json();
+        if (d.value !== null && d.value !== undefined) {
+          _cache[key] = d.value;
+          // Also update localStorage as backup
+          try { localStorage.setItem(key, d.value); } catch(_) {}
+          return d.value;
+        }
+      }
+    } catch(e) {
+      // Network failed — fall back to localStorage
+    }
+    // localStorage fallback
+    try {
+      const local = localStorage.getItem(key);
+      if (local !== null) return local;
+    } catch(_) {}
+    return fallback !== undefined ? fallback : null;
+  }
+
+  async function set(key, value) {
+    const str = typeof value === 'string' ? value : JSON.stringify(value);
+    // Update memory cache immediately
+    _cache[key] = str;
+    // Update localStorage immediately (sync)
+    try { localStorage.setItem(key, str); } catch(_) {}
+    // Push to KV async (fire and forget, don't block)
+    fetch(`${WORKER}/kv`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: str })
+    }).catch(() => {}); // Silently ignore network errors
+  }
+
+  // On load: pull all KV data and sync to localStorage
+  async function syncAll() {
+    try {
+      const r = await fetch(`${WORKER}/kv/all`);
+      if (!r.ok) return;
+      const data = await r.json();
+      for (const [k, v] of Object.entries(data)) {
+        if (v !== null && SYNC_KEYS.includes(k)) {
+          _cache[k] = v;
+          try { localStorage.setItem(k, v); } catch(_) {}
+        }
+      }
+      console.log('[KV] 云端数据同步完成');
+    } catch(e) {
+      console.log('[KV] 云端同步失败，使用本地数据:', e.message);
+    }
+  }
+
+  // Start sync when page loads
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(syncAll, 2000));
+  } else {
+    setTimeout(syncAll, 2000);
+  }
+
+  return { get, set, syncAll };
+})();
+
+// Patch localStorage to intercept learning data writes
+(function() {
+  const _origSetItem = localStorage.setItem.bind(localStorage);
+  const SYNC_KEYS = ['custom_engine_weights','err_price','err_time','err_weights','err_stats','simple_weights','price_errors','time_errors'];
+  try {
+    localStorage.setItem = function(key, value) {
+      _origSetItem(key, value);
+      if (SYNC_KEYS.includes(key)) {
+        // Push to KV async
+        _KV.set(key, value);
+      }
+    };
+  } catch(e) {
+    // SES might block this — that's OK, direct _KV.set calls will still work
+    console.log('[KV] localStorage patch skipped (SES)');
+  }
+})();
+
+
 
 
 
