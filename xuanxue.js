@@ -13,31 +13,48 @@
 
 
 // ═══════════════════════════════════════════════
-// GLOBAL SAFETY: patch toFixed to never throw on undefined/NaN
+// GLOBAL SAFETY: safe number helpers
+// NOTE: SES (Cloudflare) freezes Number.prototype — patch it safely
 // ═══════════════════════════════════════════════
 (function() {
-  const _origToFixed = Number.prototype.toFixed;
-  Number.prototype.toFixed = function(digits) {
-    if (isNaN(this) || !isFinite(this)) return '0';
-    return _origToFixed.call(this, digits);
+  // Try to patch Number.prototype for convenience, but don't crash if SES blocks it
+  try {
+    const _origToFixed = Number.prototype.toFixed;
+    const _patched = function(digits) {
+      if (isNaN(this) || !isFinite(this)) return '0';
+      return _origToFixed.call(this, digits);
+    };
+    Object.defineProperty(Number.prototype, 'toFixed', {
+      value: _patched, writable: true, configurable: true
+    });
+  } catch(e) {
+    // SES environment — Number.prototype is frozen, that's OK
+    console.log('[Safety] Number.prototype frozen by SES, using fallback helpers');
+  }
+
+  // Safe toFixed standalone function
+  window._safeFixed = function(n, digits) {
+    try {
+      const num = Number(n);
+      if (isNaN(num) || !isFinite(num)) return '0';
+      return num.toFixed(digits || 0);
+    } catch(e) { return '0'; }
   };
+
   window._sf = function(v, d) {
-    const n = Number(v);
-    if (isNaN(n) || !isFinite(n)) return '0';
-    return n.toFixed(d || 0);
+    return window._safeFixed(v, d || 0);
   };
   window._n = function(v, fallback) {
     const n = Number(v);
     return (isNaN(n) || !isFinite(n)) ? (fallback || 0) : n;
   };
-  // Safe price formatter — handles null/undefined/NaN without throwing
   window._fmtP = function(v) {
     const n = Number(v);
     if (isNaN(n) || !isFinite(n) || n === 0) return '--';
     if (n >= 10000) return '$' + Math.round(n).toLocaleString();
-    if (n >= 1)     return '$' + n.toFixed(2);
-    if (n >= 0.01)  return '$' + n.toFixed(4);
-    return '$' + n.toFixed(6);
+    if (n >= 1)     return '$' + window._safeFixed(n, 2);
+    if (n >= 0.01)  return '$' + window._safeFixed(n, 4);
+    return '$' + window._safeFixed(n, 6);
   };
 })();
 
