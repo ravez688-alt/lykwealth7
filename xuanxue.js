@@ -8257,7 +8257,8 @@ async function runDashboard() {
     btn.textContent = isHistoric ? `📅 重新推演 (${analysisDate})` : '✦ 重新推演';
     btn.classList.remove('loading');
     btn.disabled = false;
-    if (scanBar) scanBar.style.display = 'none';
+    if (scanBar) { scanBar.style.display = 'none'; }
+    document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
     renderCoinTable();
   }
 }
@@ -11492,7 +11493,7 @@ function renderCoinTable() {
   
     // remove from flex flow so table fills space
   // Desktop: show table and hide welcome
-  
+  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
   tblEl.style.display = 'table';
   // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
@@ -13170,7 +13171,7 @@ function renderCoinCards() {
   }
 
   // Have data: hide welcome, FORCE card list visible
-  
+  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
   listEl.style.setProperty('display','block','important');
   listEl.style.padding = '8px 12px 90px';
 
