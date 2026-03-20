@@ -7518,9 +7518,7 @@ const DASHBOARD_COINS = [
   { sym:'ETHUSDT',  coin:'ETH',  label:'Ethereum', color:'#627eea' },
   { sym:'SOLUSDT',  coin:'SOL',  label:'Solana',   color:'#9945ff' },
   { sym:'BNBUSDT',  coin:'BNB',  label:'BNB',      color:'#f3ba2f' },
-  { sym:'DOGEUSDT', coin:'DOGE', label:'Dogecoin', color:'#c2a633' },
-  { sym:'XRPUSDT',  coin:'XRP',  label:'Ripple',   color:'#346aa9' },
-  { sym:'PIUSDT',   coin:'PI',   label:'Pi Network',color:'#8b5cf6' },
+
   // 大宗商品 — 实时价格 via gold-api
   { coin:'XAU',  label:'黄金',  color:'#d4a030', manual:true, natalKey:'GOLD'  },
   { coin:'XAG',  label:'白银',  color:'#aaaaaa', manual:true, natalKey:'SILVER'},
@@ -8382,6 +8380,7 @@ async function runDashboard() {
     document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
     renderCoinTable();
     try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
+    try { updateLearnStatusBar(); } catch(_e) {}
 
     // iOS 强制刷新
     setTimeout(() => {
@@ -8389,6 +8388,71 @@ async function runDashboard() {
     }, 200);
   }
 }
+
+// ══════════════════════════════════════════════════════
+// 学习状态指示器
+// ══════════════════════════════════════════════════════
+function updateLearnStatusBar() {
+  const bar   = document.getElementById('learnStatusBar');
+  if (!bar) return;
+
+  // Get record count from tracker or localStorage
+  let rec = 0;
+  try {
+    rec = window.tracker?.priceErrors?.length || 0;
+    if (rec === 0) {
+      const stored = JSON.parse(localStorage.getItem('err_price') || '[]');
+      rec = stored.length;
+    }
+  } catch(_) {}
+
+  // Always show the bar
+  bar.style.display = 'flex';
+
+  const icon  = document.getElementById('learnStatusIcon');
+  const label = document.getElementById('learnStatusLabel');
+  const count = document.getElementById('learnStatusCount');
+  const fill  = document.getElementById('learnStatusFill');
+  const tip   = document.getElementById('learnStatusTip');
+
+  const pct = Math.min(100, (rec / 1000) * 100);
+  if (fill) fill.style.width = pct.toFixed(1) + '%';
+  if (count) count.textContent = rec + ' / 1000 条';
+
+  if (rec >= 1000) {
+    if (icon)  icon.textContent  = '✅';
+    if (label) { label.textContent = '系统已成熟'; label.style.color = 'var(--bull)'; }
+    if (fill)  fill.style.background = 'linear-gradient(90deg,#16a34a,#22c55e)';
+    if (tip)   tip.textContent = '权重已优化，分析可信';
+  } else if (rec >= 500) {
+    if (icon)  icon.textContent  = '🔥';
+    if (label) { label.textContent = '接近成熟'; label.style.color = 'var(--amber)'; }
+    if (fill)  fill.style.background = 'linear-gradient(90deg,#d97706,#f59e0b)';
+    if (tip)   tip.textContent = '再积累 ' + (1000 - rec) + ' 条';
+  } else if (rec >= 100) {
+    if (icon)  icon.textContent  = '📊';
+    if (label) { label.textContent = '参考级'; label.style.color = 'var(--gold)'; }
+    if (fill)  fill.style.background = 'linear-gradient(90deg,var(--gold),var(--gold3))';
+    if (tip)   tip.textContent = '再积累 ' + (1000 - rec) + ' 条';
+  } else if (rec >= 20) {
+    if (icon)  icon.textContent  = '📈';
+    if (label) { label.textContent = '初步可用'; label.style.color = '#2c50a8'; }
+    if (fill)  fill.style.background = 'linear-gradient(90deg,#2c50a8,#4a72d4)';
+    if (tip)   tip.textContent = '需更多数据';
+  } else {
+    if (icon)  icon.textContent  = '⏳';
+    if (label) { label.textContent = '积累数据中'; label.style.color = 'var(--muted)'; }
+    if (fill)  fill.style.background = 'linear-gradient(90deg,#888,#aaa)';
+    if (tip)   tip.textContent = '还需 ' + (20 - rec) + ' 条启动';
+  }
+}
+window.updateLearnStatusBar = updateLearnStatusBar;
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(updateLearnStatusBar, 1500);
+});
+
 // 显式挂载到 window（供其他模块使用）
 window.runDashboard = runDashboard;
 
@@ -11695,7 +11759,7 @@ function renderCoinTable() {
       </td>
       <td><span class="tc-score" style="color:${scoreColor}">${score}</span></td>
       <td style="white-space:nowrap">
-        <button class="tc-btn tc-btn-analyze" onclick="event.stopPropagation();event.preventDefault();openQuickAnalysis('${c.coin}')" title="快速技术分析">📊</button>
+        <button class="tc-btn tc-btn-analyze" onclick="(function(e){e.stopPropagation();e.preventDefault();openQuickAnalysis('${c.coin}');})(event)" title="快速技术分析">📊</button>
         <button class="tc-btn" onclick="event.stopPropagation();removeCoin('${c.coin}')">✕</button>
       </td>
     </tr>`;
@@ -13382,7 +13446,7 @@ function renderCoinCards() {
           <div><span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;${stageStyle}">${stageLabel}</span></div>
         </div>
       </div>
-      <button onclick="event.stopPropagation();event.preventDefault();openQuickAnalysis('${c.coin}')"
+      <button onclick="(function(e){e.stopPropagation();e.preventDefault();openQuickAnalysis('${c.coin}');})(event)"
         style="width:100%;margin-top:8px;padding:7px;background:rgba(22,163,74,.08);
           border:1px solid rgba(22,163,74,.25);border-radius:8px;color:var(--bull);
           font-weight:700;font-size:.75rem;cursor:pointer;font-family:inherit">
@@ -17769,6 +17833,7 @@ class OneClickAutomator{
       if(mode==='smart'||mode==='deep'){
         this._upd('自动学习·更新权重…',2,4);
         this._learn();await this._sl(300);
+        try { updateLearnStatusBar(); } catch(_) {}
       }
       if(mode==='deep'){
         this._upd('训练神经网络…',3,4);
@@ -20236,8 +20301,10 @@ function openQuickAnalysis(coinKey) {
     alert('数据尚未加载，请先点击「一键通·全自动推演」。');
     return;
   }
-  if (!res.klines) {
-    alert('K线数据加载中，请等待10秒后再试。');
+  if (!res.klines || res.klines.length < 10) {
+    // Try to get klines from any available source
+    console.warn('[QA] klines missing for', coinKey, 'res keys:', Object.keys(res));
+    alert('K线数据不足，请重新推演后再试。');
     return;
   }
 
@@ -20451,3 +20518,159 @@ function volDesc(ta) {
 
 window.openQuickAnalysis = openQuickAnalysis;
 console.log('✅ 真实技术分析引擎就绪');
+
+// ══════════════════════════════════════════════════════════
+// 学习报告弹窗
+// ══════════════════════════════════════════════════════════
+function openLearnReportModal() {
+  document.getElementById('learnReportModal')?.remove();
+
+  // Gather data
+  const rec    = window.tracker?.priceErrors?.length || 
+                 JSON.parse(localStorage.getItem('err_price') || '[]').length;
+  const errors = window.tracker?.priceErrors || 
+                 JSON.parse(localStorage.getItem('err_price') || '[]');
+  const weights= JSON.parse(localStorage.getItem('err_weights') || 
+                            localStorage.getItem('custom_engine_weights') || '{}');
+  const stats  = JSON.parse(localStorage.getItem('err_stats') || '{}');
+
+  // Tier
+  const tier = rec >= 1000 ? {icon:'✅', label:'已成熟', color:'var(--bull)', bg:'var(--bull-bg)', tip:'权重已充分优化，分析可信度高'}
+    : rec >= 500 ? {icon:'🔥', label:'接近成熟', color:'#d97706', bg:'rgba(217,119,6,.1)', tip:'再积累'+(1000-rec)+'条达到成熟'}
+    : rec >= 100 ? {icon:'📊', label:'参考级', color:'var(--gold)', bg:'var(--gold-bg)', tip:'有一定参考价值，继续积累'}
+    : rec >= 20  ? {icon:'📈', label:'初步可用', color:'#2c50a8', bg:'rgba(44,80,168,.1)', tip:'刚开始学习，需更多数据'}
+    : {icon:'⏳', label:'积累中', color:'var(--muted)', bg:'var(--bg2)', tip:'还需'+(20-rec)+'条开始分析'};
+
+  const pct = Math.min(100, (rec/1000)*100);
+
+  // Recent accuracy (last 20 records)
+  const recent = errors.slice(-20);
+  const recentOk = recent.filter(e => e.dirCorrect).length;
+  const recentAcc = recent.length > 0 ? Math.round(recentOk/recent.length*100) : null;
+
+  // Best/worst engines from stats
+  const engineNames = {gann:'江恩',chan:'缠论',sr:'支撑阻力',harmonic:'谐波',
+    qimen:'奇门',iching:'易经',vedic:'印度占星',natal:'命盘',ziwei:'紫微',volRate:'波动率'};
+  const engineRows = Object.entries(stats)
+    .filter(([k,v]) => v.count >= 3)
+    .map(([k,v]) => ({
+      name: engineNames[k] || k,
+      count: v.count,
+      acc: Math.round(v.dirOk/v.count*100),
+      err: (v.totalErr/v.count*100).toFixed(1)
+    }))
+    .sort((a,b) => b.acc - a.acc);
+
+  // Weight display
+  const weightRows = Object.entries(weights)
+    .filter(([k]) => engineNames[k])
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,v]) => ({name: engineNames[k]||k, w: (v*100).toFixed(1)}));
+
+  const modal = document.createElement('div');
+  modal.id = 'learnReportModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+
+  modal.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;
+      width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+
+      <!-- Header -->
+      <div style="padding:14px 18px 12px;border-bottom:1px solid var(--border);
+        display:flex;align-items:center;justify-content:space-between;
+        background:linear-gradient(135deg,var(--card),var(--card2));border-radius:16px 16px 0 0;
+        position:sticky;top:0;z-index:2">
+        <div style="font-weight:800;font-size:1rem;color:var(--text)">🧠 学习系统报告</div>
+        <button onclick="document.getElementById('learnReportModal').remove()"
+          style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;padding:4px 6px">✕</button>
+      </div>
+
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:12px">
+
+        <!-- 成熟度 -->
+        <div style="background:${tier.bg};border:1px solid ${tier.color}40;border-radius:12px;padding:14px 16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:1.5rem">${tier.icon}</span>
+            <div>
+              <div style="font-weight:800;font-size:.95rem;color:${tier.color}">${tier.label}</div>
+              <div style="font-size:.72rem;color:var(--muted);margin-top:1px">${tier.tip}</div>
+            </div>
+            <div style="margin-left:auto;text-align:right">
+              <div style="font-size:1.4rem;font-weight:900;font-family:monospace;color:${tier.color}">${rec}</div>
+              <div style="font-size:.6rem;color:var(--faint)">条记录</div>
+            </div>
+          </div>
+          <!-- 进度条 -->
+          <div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden">
+            <div style="height:100%;width:${pct.toFixed(1)}%;background:${tier.color};border-radius:3px;transition:width .5s"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:.62rem;color:var(--faint)">
+            <span>0</span><span>初步(20)</span><span>参考(100)</span><span>接近(500)</span><span>成熟(1000)</span>
+          </div>
+        </div>
+
+        <!-- 最近准确率 -->
+        ${recentAcc !== null ? `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+          <div style="font-size:.6rem;font-weight:700;color:var(--faint);letter-spacing:.08em;margin-bottom:8px">最近20次方向准确率</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="font-size:2rem;font-weight:900;font-family:monospace;color:${recentAcc>=60?'var(--bull)':recentAcc>=45?'var(--gold)':'var(--bear)'}">${recentAcc}%</div>
+            <div style="flex:1">
+              <div style="height:8px;background:var(--border2);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${recentAcc}%;background:${recentAcc>=60?'var(--bull)':recentAcc>=45?'var(--gold)':'var(--bear)'};border-radius:4px"></div>
+              </div>
+              <div style="font-size:.65rem;color:var(--muted);margin-top:4px">
+                ${recentAcc>=60?'👍 高于随机水平，系统有参考价值':recentAcc>=45?'➡ 接近随机水平，继续积累':'⚠ 低于随机，市场条件可能变化'}
+              </div>
+            </div>
+          </div>
+        </div>` : `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;text-align:center;color:var(--faint);font-size:.78rem">
+          尚无足够数据计算准确率<br>
+          <span style="font-size:.65rem">使用「智能」或「深度」模式推演后自动积累</span>
+        </div>`}
+
+        <!-- 引擎排行 -->
+        ${engineRows.length >= 3 ? `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          <div style="padding:10px 14px 8px;font-size:.6rem;font-weight:700;color:var(--faint);letter-spacing:.08em">各引擎历史准确率排行</div>
+          ${engineRows.slice(0,6).map((e,i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;${i>0?'border-top:1px solid var(--border)':''}">
+            <span style="font-size:.65rem;color:var(--faint);width:14px">${i+1}</span>
+            <span style="font-size:.78rem;font-weight:700;color:var(--text);flex:1">${e.name}</span>
+            <span style="font-size:.65rem;color:var(--muted)">${e.count}次</span>
+            <div style="width:60px;height:4px;background:var(--border2);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${e.acc}%;background:${e.acc>=60?'var(--bull)':e.acc>=45?'var(--gold)':'var(--bear)'};border-radius:2px"></div>
+            </div>
+            <span style="font-size:.75rem;font-weight:700;font-family:monospace;color:${e.acc>=60?'var(--bull)':e.acc>=45?'var(--gold)':'var(--bear)'};width:34px;text-align:right">${e.acc}%</span>
+          </div>`).join('')}
+        </div>` : ''}
+
+        <!-- 当前权重 -->
+        ${weightRows.length >= 2 ? `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          <div style="padding:10px 14px 8px;font-size:.6rem;font-weight:700;color:var(--faint);letter-spacing:.08em">当前学习权重</div>
+          ${weightRows.slice(0,6).map((w,i) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;${i>0?'border-top:1px solid var(--border)':''}">
+            <span style="font-size:.75rem;color:var(--text);flex:1">${w.name}</span>
+            <div style="width:80px;height:4px;background:var(--border2);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${Math.min(100,w.w*5)}%;background:var(--gold);border-radius:2px"></div>
+            </div>
+            <span style="font-size:.7rem;font-family:monospace;color:var(--gold);width:36px;text-align:right">${w.w}%</span>
+          </div>`).join('')}
+        </div>` : ''}
+
+        <!-- 说明 -->
+        <div style="font-size:.65rem;color:var(--faint);text-align:center;padding-bottom:4px;line-height:1.8">
+          使用「智能」或「深度」模式每次推演后自动积累<br>
+          系统会在3天后自动验证预测准确性并更新权重
+        </div>
+
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+}
+window.openLearnReportModal = openLearnReportModal;
+
