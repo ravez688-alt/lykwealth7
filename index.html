@@ -535,6 +535,7 @@ body {
   background: var(--bg);
   pointer-events: none;
 }
+.welcome { display: none !important; }
 .welcome.hidden { display: none !important; }
 .welcome-icon { font-size: 3.2rem; opacity: .2; }
 .welcome-title {
@@ -1478,6 +1479,21 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
         </select>
       </div>
       <div id="autoReport"></div>
+      <!-- 学习状态指示器 -->
+      <div id="learnStatusBar" style="display:none;padding:5px 14px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;gap:8px;font-size:.72rem;flex-shrink:0;cursor:pointer" onclick="openLearnReportModal()">
+        <span id="learnStatusIcon" style="font-size:.85rem">⏳</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+            <span id="learnStatusLabel" style="color:var(--muted);font-weight:600">学习系统</span>
+            <span id="learnStatusCount" style="color:var(--faint);font-size:.65rem">0 / 1000 条</span>
+          </div>
+          <div style="height:3px;background:var(--border2);border-radius:2px;overflow:hidden">
+            <div id="learnStatusFill" style="height:100%;width:0%;border-radius:2px;background:linear-gradient(90deg,#2c50a8,#4a72d4);transition:width .5s"></div>
+          </div>
+        </div>
+        <span id="learnStatusTip" style="color:var(--faint);font-size:.62rem;white-space:nowrap;flex-shrink:0"></span>
+        <span style="color:var(--faint);font-size:.65rem;flex-shrink:0">查看报告 ›</span>
+      </div>
 
       <!-- 天时地利人和 三才卡片 -->
       <div id="tiandiRow" style="display:none;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:6px 14px 0;flex-shrink:0"></div>
@@ -1535,7 +1551,6 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
       <!-- Table -->
       <div class="table-wrap" id="tableWrap">
-        
 
         <!-- Mobile card list (shown instead of table on small screens) -->
         <div id="coinCardList" class="coin-card-list"></div>
