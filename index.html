@@ -1761,69 +1761,6 @@ window.addEventListener('load', function() {
 </script>
 
 
-<script>
-/* ── 手机调试工具 — 只在 ?debug=1 时启用 ── */
-if (location.search.includes('debug=1')) {
-  var dbg = document.createElement('div');
-  dbg.id = '_debugBox';
-  dbg.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,.9);color:#0f0;font-family:monospace;font-size:11px;padding:8px;max-height:40vh;overflow-y:auto;border-top:2px solid #0f0';
-  document.body.appendChild(dbg);
-
-  function dlog(msg, color) {
-    var line = document.createElement('div');
-    line.style.color = color || '#0f0';
-    line.textContent = new Date().toISOString().slice(11,19) + ' ' + msg;
-    dbg.appendChild(line);
-    dbg.scrollTop = dbg.scrollHeight;
-  }
-
-  // Override console
-  var _log = console.log, _warn = console.warn, _err = console.error;
-  console.log   = function() { _log.apply(console,arguments);  dlog(Array.from(arguments).join(' ')); };
-  console.warn  = function() { _warn.apply(console,arguments); dlog('[WARN] '+Array.from(arguments).join(' '), '#ff0'); };
-  console.error = function() { _err.apply(console,arguments);  dlog('[ERR] '+Array.from(arguments).join(' '), '#f44'); };
-
-  window.addEventListener('error', function(e) {
-    dlog('[JS ERROR] ' + e.message + ' @ line ' + e.lineno, '#f44');
-  });
-  window.addEventListener('unhandledrejection', function(e) {
-    dlog('[PROMISE] ' + (e.reason?.message || e.reason), '#f44');
-  });
-
-  // Monitor coinCardList
-  setInterval(function() {
-    var el = document.getElementById('coinCardList');
-    if (!el) return;
-    var style = window.getComputedStyle(el);
-    var info = 'coinCardList: display=' + style.display +
-               ' h=' + el.offsetHeight +
-               ' children=' + el.children.length +
-               ' innerHTML=' + (el.innerHTML.length > 0 ? el.innerHTML.length + 'chars' : 'EMPTY');
-    document.getElementById('_dbgCardInfo').textContent = info;
-  }, 1000);
-
-  var info = document.createElement('div');
-  info.id = '_dbgCardInfo';
-  info.style.cssText = 'color:#ff0;border-top:1px solid #333;margin-top:4px;padding-top:4px';
-  dbg.appendChild(info);
-
-  dlog('Debug mode ON — iOS ' + (navigator.userAgent.match(/OS ([\d_]+)/) || ['','?'])[1]);
-  dlog('SES active: ' + (typeof lockdown !== 'undefined' ? 'YES' : 'NO'));
-  
-  // Monitor dashResults
-  setInterval(function() {
-    var results = window.dashResults || {};
-    var coins = window.dashCoins || [];
-    var filled = coins.filter(function(c) { 
-      return results[c.coin] && results[c.coin] !== 'loading' && results[c.coin].price; 
-    }).length;
-    document.getElementById('_dbgCardInfo').textContent = 
-      'cards:' + (document.getElementById('coinCardList') || {}).children.length +
-      ' results:' + filled + '/' + coins.length +
-      ' display:' + (window.getComputedStyle(document.getElementById('coinCardList') || document.body).display);
-  }, 1000);
-}
-</script>
 
 </body>
 </html>
