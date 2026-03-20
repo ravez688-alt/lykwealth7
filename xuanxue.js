@@ -7967,7 +7967,7 @@ async function runDashboard() {
   btn.classList.add('loading');
   if (scanBar) scanBar.style.display = 'flex';
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
-  if (_wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
+  if (typeof _wEl !== 'undefined' && _wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
   renderCoinList(); renderCoinTable();
 
@@ -8258,6 +8258,7 @@ async function runDashboard() {
     btn.classList.remove('loading');
     btn.disabled = false;
     if (scanBar) scanBar.style.display = 'none';
+    document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
     renderCoinTable();
   }
 }
@@ -11492,7 +11493,7 @@ function renderCoinTable() {
   
     // remove from flex flow so table fills space
   // Desktop: show table and hide welcome
-  
+  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
   tblEl.style.display = 'table';
   // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
@@ -13173,7 +13174,7 @@ function renderCoinCards() {
   }
 
   // Have data: hide welcome, FORCE card list visible
-  
+  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
   listEl.style.setProperty('display','block','important');
   listEl.style.padding = '8px 12px 90px';
 
