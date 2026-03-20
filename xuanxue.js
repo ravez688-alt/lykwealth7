@@ -7518,6 +7518,9 @@ const DASHBOARD_COINS = [
   { sym:'ETHUSDT',  coin:'ETH',  label:'Ethereum', color:'#627eea' },
   { sym:'SOLUSDT',  coin:'SOL',  label:'Solana',   color:'#9945ff' },
   { sym:'BNBUSDT',  coin:'BNB',  label:'BNB',      color:'#f3ba2f' },
+  { sym:'DOGEUSDT', coin:'DOGE', label:'Dogecoin', color:'#c2a633' },
+  { sym:'XRPUSDT',  coin:'XRP',  label:'Ripple',   color:'#346aa9' },
+  { sym:'PIUSDT',   coin:'PI',   label:'Pi Network',color:'#8b5cf6' },
   // 大宗商品 — 实时价格 via gold-api
   { coin:'XAU',  label:'黄金',  color:'#d4a030', manual:true, natalKey:'GOLD'  },
   { coin:'XAG',  label:'白银',  color:'#aaaaaa', manual:true, natalKey:'SILVER'},
@@ -11692,7 +11695,7 @@ function renderCoinTable() {
       </td>
       <td><span class="tc-score" style="color:${scoreColor}">${score}</span></td>
       <td style="white-space:nowrap">
-        <button class="tc-btn tc-btn-analyze" onclick="event.stopPropagation();openQuickAnalysis('${c.coin}')" title="快速技术分析">📊</button>
+        <button class="tc-btn tc-btn-analyze" onclick="event.stopPropagation();event.preventDefault();openQuickAnalysis('${c.coin}')" title="快速技术分析">📊</button>
         <button class="tc-btn" onclick="event.stopPropagation();removeCoin('${c.coin}')">✕</button>
       </td>
     </tr>`;
@@ -13379,7 +13382,7 @@ function renderCoinCards() {
           <div><span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;${stageStyle}">${stageLabel}</span></div>
         </div>
       </div>
-      <button onclick="event.stopPropagation();openQuickAnalysis('${c.coin}')"
+      <button onclick="event.stopPropagation();event.preventDefault();openQuickAnalysis('${c.coin}')"
         style="width:100%;margin-top:8px;padding:7px;background:rgba(22,163,74,.08);
           border:1px solid rgba(22,163,74,.25);border-radius:8px;color:var(--bull);
           font-weight:700;font-size:.75rem;cursor:pointer;font-family:inherit">
