@@ -7967,7 +7967,7 @@ async function runDashboard() {
   btn.classList.add('loading');
   if (scanBar) scanBar.style.display = 'flex';
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
-  if (_wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
+  if (typeof _wEl !== 'undefined' && _wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
   renderCoinList(); renderCoinTable();
 
