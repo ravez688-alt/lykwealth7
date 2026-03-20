@@ -8146,6 +8146,7 @@ async function runDashboard() {
         const titles = ['天地否塞·空头','阴云密布·偏空','中性徘徊','温和向上·偏多','天时地利·强多'];
         dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, price, chg24, high, low, score:score1, avgBias:avgBias1, avgConf:.5, verdictTitle:titles[score1>=80?4:score1>=60?3:score1>=45?2:score1>=30?1:0], _partial:true };
         try { renderCoinTable(); } catch(e) {}
+        try { if (typeof renderCoinCards==='function') renderCoinCards(); } catch(_e) {}
 
         // ── Phase 2: Heavier engines ──
         await new Promise(r => setTimeout(r, 0));
@@ -8260,6 +8261,7 @@ async function runDashboard() {
     if (scanBar) scanBar.style.display = 'none';
     document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
     renderCoinTable();
+    try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
   }
 }
 // 显式挂载到 window（供其他模块使用）
@@ -11487,7 +11489,7 @@ function renderCoinTable() {
        // CSS default (flex)
     tblEl.style.display = 'none';
     const cardList = document.getElementById('coinCardList');
-    if (cardList) cardList.innerHTML = '';     // empty → CSS :empty hides it
+    if (cardList) { cardList.innerHTML = ''; cardList.style.removeProperty('display'); }
     return;
   }
   
@@ -13168,14 +13170,13 @@ function renderCoinCards() {
 
   if (!hasAny) {
     listEl.innerHTML = '';
-    listEl.style.display = 'none';
-    
+    listEl.style.removeProperty('display'); // let CSS :empty rule handle hiding
     return;
   }
 
   // Have data: hide welcome, FORCE card list visible
   document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
-  listEl.style.setProperty('display','block','important');
+  listEl.style.removeProperty('display'); // remove any inline override, let CSS !important take over
   listEl.style.padding = '8px 12px 90px';
 
   const fmtP = v => {
