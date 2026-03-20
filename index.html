@@ -216,24 +216,22 @@ body {
 /* TF buttons */
 .tf-grid { display: flex; flex-wrap: wrap; gap: 4px; }
 .tf-btn {
-  padding: 5px 11px;
+  padding: 5px 10px;
   border-radius: 20px;
   font-size: .72rem;
-  font-weight: 700;
+  font-weight: 600;
   border: 1px solid var(--border2);
   background: var(--bg2);
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
-  letter-spacing: .02em;
-  transition: all .15s;
+  transition: all .12s;
 }
-.tf-btn:hover { border-color: var(--gold2); color: var(--gold); background: var(--gold-bg); }
+.tf-btn:hover { border-color: var(--gold2); color: var(--gold); }
 .tf-btn.active {
-  background: linear-gradient(135deg, var(--gold), var(--gold3));
+  background: var(--gold);
   border-color: var(--gold);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(140,100,16,.25);
 }
 
 /* System selector buttons */
@@ -383,14 +381,12 @@ body {
   border: 1px solid var(--gold-bd);
   color: var(--gold2);
   border-radius: var(--r-sm);
-  padding: 6px 13px;
+  padding: 6px 12px;
   font-size: .78rem; font-weight: 700;
   cursor: pointer; font-family: inherit;
-  letter-spacing: .02em;
-  transition: all .15s;
-  white-space: nowrap;
+  transition: all .12s;
 }
-.strat-btn:hover { background: rgba(200,150,30,.18); border-color: var(--gold2); color: var(--gold); }
+.strat-btn:hover { background: rgba(200,150,30,.18); border-color: var(--gold2); }
 
 .back-btn {
   background: var(--bg2); border: 1px solid var(--border2);
@@ -600,6 +596,8 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   cursor: pointer; font-family: inherit;
 }
 .tc-btn:hover { color: var(--bear); border-color: var(--bear-bd); }
+.tc-btn-analyze { color: var(--bull) !important; border-color: rgba(22,163,74,.3) !important; background: rgba(22,163,74,.07) !important; }
+.tc-btn-analyze:hover { background: rgba(22,163,74,.18) !important; border-color: var(--bull) !important; }
 
 /* ── Mobile card list ── */
 .coin-card-list { display: block; padding: 10px 12px 80px; }
@@ -724,105 +722,15 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   border-bottom: 1px solid var(--border);
 }
 .tab {
-  padding: 5px 13px; border-radius: 20px;
-  font-size: .72rem; font-weight: 700;
+  padding: 5px 12px; border-radius: 20px;
+  font-size: .72rem; font-weight: 600;
   border: 1px solid var(--border2); background: var(--bg2); color: var(--muted);
-  cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
-  letter-spacing: .02em;
+  cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap;
 }
-.tab:hover { border-color: var(--gold2); color: var(--gold); background: var(--gold-bg); }
-.tab.active {
-  background: linear-gradient(135deg, var(--gold), var(--gold3));
-  border-color: var(--gold);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(140,100,16,.25);
-}
+.tab:hover { border-color: var(--gold2); color: var(--gold); }
+.tab.active { background: var(--gold); border-color: var(--gold); color: #fff; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
-
-/* ── viz-tab (引擎图表 / 奇门九宫 / 紫微盘 / 星宿盘 / 智能提醒) ── */
-.viz-tab {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: .72rem;
-  font-weight: 700;
-  border: 1px solid var(--border2);
-  background: var(--bg2);
-  color: var(--muted);
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: .02em;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.viz-tab:hover {
-  border-color: var(--gold2);
-  color: var(--gold);
-  background: var(--gold-bg);
-}
-.viz-tab.active {
-  background: linear-gradient(135deg, var(--gold), var(--gold3));
-  border-color: var(--gold);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(140,100,16,.25);
-}
-
-/* ── mtf-tab (1H短线 / 4H主力 / 1D趋势 / 1W大级别) ── */
-#mtfTabBar {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 10px 18px 8px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-.mtf-tab {
-  padding: 5px 13px;
-  border-radius: 20px;
-  font-size: .72rem;
-  font-weight: 700;
-  border: 1px solid var(--border2);
-  background: var(--bg2);
-  color: var(--muted);
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: .02em;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.mtf-tab:hover {
-  border-color: var(--gold2);
-  color: var(--gold);
-  background: var(--gold-bg);
-}
-.mtf-tab.active {
-  background: linear-gradient(135deg, #2c50a8, #4a72d4);
-  border-color: #2c50a8;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(44,80,168,.25);
-}
-
-/* ── extra-btn (⚖️ 权重) ── */
-.extra-btn {
-  padding: 6px 12px;
-  border-radius: var(--r-sm);
-  font-size: .78rem;
-  font-weight: 700;
-  border: 1px solid rgba(140,100,16,.3);
-  background: rgba(140,100,16,.08);
-  color: var(--gold2);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all .15s;
-  white-space: nowrap;
-}
-.extra-btn:hover {
-  background: rgba(140,100,16,.18);
-  border-color: var(--gold2);
-  color: var(--gold);
-}
 
 /* Results */
 .results { display: none; }
@@ -941,7 +849,6 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
 /* ── Spinner ── */
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
 .spinner {
   display: inline-block; width: 11px; height: 11px;
   border: 2px solid var(--border2); border-top-color: var(--gold);
@@ -1540,7 +1447,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
               <th style="width:66px">风险</th>
               <th style="width:80px">波动率</th>
               <th style="width:70px">综合评分</th>
-              <th style="width:40px"></th>
+              <th style="width:60px"></th>
             </tr>
           </thead>
           <tbody id="coinTblBody"></tbody>
