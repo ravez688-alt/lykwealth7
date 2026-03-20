@@ -7967,7 +7967,7 @@ async function runDashboard() {
   btn.classList.add('loading');
   if (scanBar) scanBar.style.display = 'flex';
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
-  if (typeof _wEl !== 'undefined' && _wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
+  if (_wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
   renderCoinList(); renderCoinTable();
 
@@ -8257,8 +8257,7 @@ async function runDashboard() {
     btn.textContent = isHistoric ? `📅 重新推演 (${analysisDate})` : '✦ 重新推演';
     btn.classList.remove('loading');
     btn.disabled = false;
-    if (scanBar) { scanBar.style.display = 'none'; }
-    document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
+    if (scanBar) scanBar.style.display = 'none';
     renderCoinTable();
   }
 }
@@ -11493,7 +11492,7 @@ function renderCoinTable() {
   
     // remove from flex flow so table fills space
   // Desktop: show table and hide welcome
-  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
+  
   tblEl.style.display = 'table';
   // Mobile: CSS hides table; sync cards
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
@@ -13171,7 +13170,7 @@ function renderCoinCards() {
   }
 
   // Have data: hide welcome, FORCE card list visible
-  document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
+  
   listEl.style.setProperty('display','block','important');
   listEl.style.padding = '8px 12px 90px';
 
@@ -17319,10 +17318,35 @@ function injectEnhancedPanels(coin, engines) {
     <!-- 问答 -->
     <div style="${cardStyle}">
       <div style="${titleStyle}">💬 玄学问答</div>
-      <div id="xqaBox">
-        <input id="xqaInput" type="text" placeholder='如："今天能买${coin}吗？" 或 "本周${coin}怎么看"'
-          onkeydown="if(event.key==='Enter'){const a=askXuanXue(this.value);const el=document.getElementById('xqaAnswer');el.textContent=a;el.style.display='block';}">
-        <div id="xqaAnswer"></div>
+      <div id="xqaBox" style="display:flex;flex-direction:column;gap:8px">
+        <div style="position:relative;display:flex;align-items:center;gap:0">
+          <span style="position:absolute;left:11px;font-size:.85rem;opacity:.5;pointer-events:none">🔮</span>
+          <input id="xqaInput" type="text"
+            placeholder='如："今天能买${coin}吗？" 或 "本周${coin}怎么看"'
+            style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:10px 0 0 10px;
+              padding:9px 12px 9px 34px;color:var(--text);font-family:inherit;font-size:.82rem;
+              outline:none;transition:border-color .15s;min-width:0"
+            onfocus="this.style.borderColor='var(--gold2)'"
+            onblur="this.style.borderColor='var(--border2)'"
+            onkeydown="if(event.key==='Enter'){
+              const a=askXuanXue(this.value);
+              const el=document.getElementById('xqaAnswer');
+              el.innerHTML=a;
+              el.style.display='block';
+            }">
+          <button
+            onclick="const a=askXuanXue(document.getElementById('xqaInput').value);const el=document.getElementById('xqaAnswer');el.innerHTML=a;el.style.display='block';"
+            style="padding:9px 14px;background:linear-gradient(135deg,var(--gold),var(--gold3));
+              border:1px solid var(--gold);border-radius:0 10px 10px 0;color:#fff;
+              font-weight:700;font-size:.8rem;cursor:pointer;font-family:inherit;
+              white-space:nowrap;transition:opacity .15s"
+            onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+            问卦 ↵
+          </button>
+        </div>
+        <div id="xqaAnswer" style="display:none;background:var(--gold-bg);border:1px solid var(--gold-bd);
+          border-radius:10px;padding:10px 13px;font-size:.8rem;color:var(--text);
+          line-height:1.7;animation:fadeIn .2s ease"></div>
       </div>
     </div>
     <!-- 趋势图 -->
