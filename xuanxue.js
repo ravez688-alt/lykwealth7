@@ -11566,7 +11566,10 @@ function renderCoinTable() {
         <div style="font-size:.58rem;color:var(--muted)">${Math.abs(chg).toFixed(2)}%</div>
       </td>
       <td><span class="tc-score" style="color:${scoreColor}">${score}</span></td>
-      <td><button class="tc-btn" onclick="event.stopPropagation();removeCoin('${c.coin}')">✕</button></td>
+      <td style="white-space:nowrap">
+        <button class="tc-btn tc-btn-analyze" onclick="event.stopPropagation();openQuickAnalysis('${c.coin}')" title="快速技术分析">📊</button>
+        <button class="tc-btn" onclick="event.stopPropagation();removeCoin('${c.coin}')">✕</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -13258,6 +13261,12 @@ function renderCoinCards() {
           <div><span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;${stageStyle}">${stageLabel}</span></div>
         </div>
       </div>
+      <button onclick="event.stopPropagation();openQuickAnalysis('${c.coin}')"
+        style="width:100%;margin-top:8px;padding:7px;background:rgba(22,163,74,.08);
+          border:1px solid rgba(22,163,74,.25);border-radius:8px;color:var(--bull);
+          font-weight:700;font-size:.75rem;cursor:pointer;font-family:inherit">
+        📊 快速技术分析
+      </button>
     </div>`;
   }).join('');
 
@@ -17318,35 +17327,10 @@ function injectEnhancedPanels(coin, engines) {
     <!-- 问答 -->
     <div style="${cardStyle}">
       <div style="${titleStyle}">💬 玄学问答</div>
-      <div id="xqaBox" style="display:flex;flex-direction:column;gap:8px">
-        <div style="position:relative;display:flex;align-items:center;gap:0">
-          <span style="position:absolute;left:11px;font-size:.85rem;opacity:.5;pointer-events:none">🔮</span>
-          <input id="xqaInput" type="text"
-            placeholder='如："今天能买${coin}吗？" 或 "本周${coin}怎么看"'
-            style="flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:10px 0 0 10px;
-              padding:9px 12px 9px 34px;color:var(--text);font-family:inherit;font-size:.82rem;
-              outline:none;transition:border-color .15s;min-width:0"
-            onfocus="this.style.borderColor='var(--gold2)'"
-            onblur="this.style.borderColor='var(--border2)'"
-            onkeydown="if(event.key==='Enter'){
-              const a=askXuanXue(this.value);
-              const el=document.getElementById('xqaAnswer');
-              el.innerHTML=a;
-              el.style.display='block';
-            }">
-          <button
-            onclick="const a=askXuanXue(document.getElementById('xqaInput').value);const el=document.getElementById('xqaAnswer');el.innerHTML=a;el.style.display='block';"
-            style="padding:9px 14px;background:linear-gradient(135deg,var(--gold),var(--gold3));
-              border:1px solid var(--gold);border-radius:0 10px 10px 0;color:#fff;
-              font-weight:700;font-size:.8rem;cursor:pointer;font-family:inherit;
-              white-space:nowrap;transition:opacity .15s"
-            onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-            问卦 ↵
-          </button>
-        </div>
-        <div id="xqaAnswer" style="display:none;background:var(--gold-bg);border:1px solid var(--gold-bd);
-          border-radius:10px;padding:10px 13px;font-size:.8rem;color:var(--text);
-          line-height:1.7;animation:fadeIn .2s ease"></div>
+      <div id="xqaBox">
+        <input id="xqaInput" type="text" placeholder='如："今天能买${coin}吗？" 或 "本周${coin}怎么看"'
+          onkeydown="if(event.key==='Enter'){const a=askXuanXue(this.value);const el=document.getElementById('xqaAnswer');el.textContent=a;el.style.display='block';}">
+        <div id="xqaAnswer"></div>
       </div>
     </div>
     <!-- 趋势图 -->
@@ -19811,3 +19795,552 @@ ${tpLines.join('\n')}
 }
 
 console.log('✅ 行情说明弹窗就绪');
+
+
+// ══════════════════════════════════════════════════════════════════
+// 真实技术分析引擎 — realTA
+// 基于真实K线数据，无任何伪随机，输出博主风格中文分析
+// ══════════════════════════════════════════════════════════════════
+
+const realTA = (() => {
+
+  // ── 工具函数 ──────────────────────────────────────────────────
+  function ema(arr, period) {
+    const k = 2 / (period + 1);
+    const result = [];
+    let prev = null;
+    for (let i = 0; i < arr.length; i++) {
+      if (prev === null) {
+        // 用前 period 根的简单均值作为初始值
+        if (i < period - 1) { result.push(null); continue; }
+        const slice = arr.slice(0, period);
+        prev = slice.reduce((s, v) => s + v, 0) / period;
+        result.push(prev);
+      } else {
+        prev = arr[i] * k + prev * (1 - k);
+        result.push(prev);
+      }
+    }
+    return result;
+  }
+
+  function sma(arr, period) {
+    return arr.map((_, i) => {
+      if (i < period - 1) return null;
+      return arr.slice(i - period + 1, i + 1).reduce((s, v) => s + v, 0) / period;
+    });
+  }
+
+  function rsi(closes, period = 14) {
+    const result = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (i < period) { result.push(null); continue; }
+      let gains = 0, losses = 0;
+      for (let j = i - period + 1; j <= i; j++) {
+        const diff = closes[j] - closes[j - 1];
+        if (diff > 0) gains += diff; else losses -= diff;
+      }
+      const avgG = gains / period, avgL = losses / period;
+      result.push(avgL === 0 ? 100 : 100 - 100 / (1 + avgG / avgL));
+    }
+    return result;
+  }
+
+  function macd(closes, fast = 12, slow = 26, signal = 9) {
+    const emaFast = ema(closes, fast);
+    const emaSlow = ema(closes, slow);
+    const macdLine = closes.map((_, i) =>
+      emaFast[i] !== null && emaSlow[i] !== null ? emaFast[i] - emaSlow[i] : null
+    );
+    const validMacd = macdLine.filter(v => v !== null);
+    const signalRaw = ema(validMacd, signal);
+    // 重新对齐 signal 到原始长度
+    const signalLine = macdLine.map((v, i) => {
+      if (v === null) return null;
+      const idx = macdLine.slice(0, i + 1).filter(x => x !== null).length - 1;
+      return signalRaw[idx] !== undefined ? signalRaw[idx] : null;
+    });
+    const hist = macdLine.map((v, i) =>
+      v !== null && signalLine[i] !== null ? v - signalLine[i] : null
+    );
+    return { macdLine, signalLine, hist };
+  }
+
+  function bollingerBands(closes, period = 20, mult = 2) {
+    return closes.map((_, i) => {
+      if (i < period - 1) return null;
+      const slice = closes.slice(i - period + 1, i + 1);
+      const mean = slice.reduce((s, v) => s + v, 0) / period;
+      const std = Math.sqrt(slice.reduce((s, v) => s + (v - mean) ** 2, 0) / period);
+      return { upper: mean + mult * std, mid: mean, lower: mean - mult * std };
+    });
+  }
+
+  // ── 支撑阻力识别（基于局部高低点） ────────────────────────────
+  function findSRLevels(klines, lookback = 5) {
+    const highs = klines.map(k => k[2]);
+    const lows  = klines.map(k => k[3]);
+    const levels = [];
+
+    for (let i = lookback; i < klines.length - lookback; i++) {
+      const h = highs[i];
+      const l = lows[i];
+      // 局部高点
+      if (highs.slice(i - lookback, i).every(v => v <= h) &&
+          highs.slice(i + 1, i + lookback + 1).every(v => v <= h)) {
+        levels.push({ price: h, type: 'resistance', strength: 1 });
+      }
+      // 局部低点
+      if (lows.slice(i - lookback, i).every(v => v >= l) &&
+          lows.slice(i + 1, i + lookback + 1).every(v => v >= l)) {
+        levels.push({ price: l, type: 'support', strength: 1 });
+      }
+    }
+
+    // 合并相近价位（1.5%以内）
+    const merged = [];
+    for (const lv of levels) {
+      const existing = merged.find(m =>
+        Math.abs(m.price - lv.price) / lv.price < 0.015 && m.type === lv.type
+      );
+      if (existing) { existing.strength++; existing.price = (existing.price + lv.price) / 2; }
+      else merged.push({ ...lv });
+    }
+
+    return merged.sort((a, b) => b.strength - a.strength).slice(0, 8);
+  }
+
+  // ── 缠论风格：识别笔方向和中枢 ─────────────────────────────────
+  function chanAnalysis(klines) {
+    const n = klines.length;
+    const closes = klines.map(k => parseFloat(k[4]));
+    const highs  = klines.map(k => parseFloat(k[2]));
+    const lows   = klines.map(k => parseFloat(k[3]));
+
+    // 找最近高低点
+    const recentHigh = Math.max(...highs.slice(-10));
+    const recentLow  = Math.min(...lows.slice(-10));
+    const curPrice   = closes[n - 1];
+    const prevClose  = closes[n - 2];
+
+    // 识别近期方向
+    const ema5  = ema(closes, 5);
+    const ema13 = ema(closes, 13);
+    const ema34 = ema(closes, 34);
+
+    const e5  = ema5[n - 1];
+    const e13 = ema13[n - 1];
+    const e34 = ema34[n - 1];
+
+    // 均线排列
+    const bullAlign = e5 > e13 && e13 > e34;
+    const bearAlign = e5 < e13 && e13 < e34;
+
+    // 连续涨跌计数
+    let upCount = 0, dnCount = 0;
+    for (let i = n - 1; i >= Math.max(0, n - 8); i--) {
+      if (closes[i] > closes[i - 1]) { if (dnCount === 0) upCount++; else break; }
+      else { if (upCount === 0) dnCount++; else break; }
+    }
+
+    // 中枢识别：取最近3段高低区间
+    const pivot = {
+      high: Math.max(...highs.slice(-6, -3)),
+      low:  Math.min(...lows.slice(-6, -3)),
+    };
+    const inPivot = curPrice >= pivot.low && curPrice <= pivot.high;
+
+    // 趋势强度
+    const trendStrength = bullAlign ? 'strong_bull' : bearAlign ? 'strong_bear' :
+      e5 > e13 ? 'mild_bull' : e5 < e13 ? 'mild_bear' : 'sideways';
+
+    // 背驰判断（简化版：价格新高但涨势收窄）
+    const priceHigher = highs[n - 1] > highs[n - 4];
+    const rangeSmaller = (highs[n - 1] - lows[n - 1]) < (highs[n - 4] - lows[n - 4]) * 0.7;
+    const beichi = priceHigher && rangeSmaller && bearAlign === false;
+
+    return {
+      trend: trendStrength,
+      bullAlign, bearAlign,
+      ema5: e5, ema13: e13, ema34: e34,
+      recentHigh, recentLow, curPrice,
+      pivot, inPivot,
+      upCount, dnCount,
+      beichi,
+    };
+  }
+
+  // ── 主分析函数 ──────────────────────────────────────────────────
+  function analyze(coin, price, klines, chg24, high, low) {
+    if (!klines || klines.length < 20) return null;
+
+    const closes = klines.map(k => parseFloat(k[4]));
+    const highs  = klines.map(k => parseFloat(k[2]));
+    const lows_  = klines.map(k => parseFloat(k[3]));
+    const vols   = klines.map(k => parseFloat(k[5]));
+    const n = closes.length;
+
+    // ── 指标计算 ──
+    const rsiVals  = rsi(closes, 14);
+    const curRSI   = rsiVals[n - 1];
+    const macdRes  = macd(closes);
+    const curMACD  = macdRes.macdLine[n - 1];
+    const curSig   = macdRes.signalLine[n - 1];
+    const curHist  = macdRes.hist[n - 1];
+    const prevHist = macdRes.hist[n - 2];
+    const bbVals   = bollingerBands(closes);
+    const curBB    = bbVals[n - 1];
+    const ema5vals = ema(closes, 5);
+    const ema13vals= ema(closes, 13);
+    const ema34vals= ema(closes, 34);
+    const e5  = ema5vals[n - 1];
+    const e13 = ema13vals[n - 1];
+    const e34 = ema34vals[n - 1];
+
+    // ── 支撑阻力 ──
+    const srLevels = findSRLevels(klines);
+    const supports   = srLevels.filter(l => l.type === 'support'  && l.price < price).sort((a,b) => b.price - a.price);
+    const resistances= srLevels.filter(l => l.type === 'resistance'&& l.price > price).sort((a,b) => a.price - b.price);
+
+    // ── 缠论分析 ──
+    const chan = chanAnalysis(klines);
+
+    // ── 成交量判断 ──
+    const avgVol = vols.slice(-10).reduce((s,v)=>s+v,0)/10;
+    const curVol = vols[n - 1];
+    const volRatio = curVol / avgVol;
+    const volDesc = volRatio > 1.5 ? '放量' : volRatio < 0.6 ? '缩量' : '量平';
+
+    // ── 综合信号 ──
+    let bullPoints = 0, bearPoints = 0;
+    if (chan.bullAlign) bullPoints += 2;
+    if (chan.bearAlign) bearPoints += 2;
+    if (curRSI < 35) bullPoints += 1;
+    if (curRSI > 65) bearPoints += 1;
+    if (curHist > 0 && prevHist < 0) bullPoints += 2; // MACD金叉
+    if (curHist < 0 && prevHist > 0) bearPoints += 2; // MACD死叉
+    if (curHist > prevHist) bullPoints += 1;
+    if (curHist < prevHist) bearPoints += 1;
+    if (price > e5 && price > e13) bullPoints += 1;
+    if (price < e5 && price < e13) bearPoints += 1;
+    if (curBB && price < curBB.lower) bullPoints += 1;
+    if (curBB && price > curBB.upper) bearPoints += 1;
+    if (chg24 > 0 && volRatio > 1.2) bullPoints += 1;
+    if (chg24 < 0 && volRatio > 1.2) bearPoints += 1;
+
+    const signal = bullPoints > bearPoints + 1 ? 'LONG' :
+                   bearPoints > bullPoints + 1 ? 'SHORT' : 'NEUTRAL';
+
+    // ── 止盈止损计算 ──
+    const atr = closes.slice(-14).reduce((s, _, i, arr) => {
+      if (i === 0) return s;
+      return s + Math.abs(arr[i] - arr[i-1]);
+    }, 0) / 13;
+
+    const sl = signal === 'LONG'
+      ? (supports[0]?.price || price * 0.97)
+      : (resistances[0]?.price || price * 1.03);
+    const tp1 = signal === 'LONG'
+      ? (resistances[0]?.price || price + atr * 2)
+      : (supports[0]?.price || price - atr * 2);
+    const tp2 = signal === 'LONG'
+      ? (resistances[1]?.price || price + atr * 3.5)
+      : (supports[1]?.price || price - atr * 3.5);
+
+    return {
+      signal, bullPoints, bearPoints,
+      curRSI, curMACD, curSig, curHist, prevHist,
+      curBB, e5, e13, e34,
+      chan, supports, resistances,
+      volDesc, volRatio, atr,
+      sl, tp1, tp2,
+    };
+  }
+
+  // ── 生成博主风格中文分析文字 ─────────────────────────────────────
+  function generateText(coin, price, ta, tf = '4H') {
+    if (!ta) return '数据不足，无法分析。';
+    const { signal, chan, curRSI, curHist, prevHist, curBB,
+            e5, e13, e34, supports, resistances, volDesc,
+            sl, tp1, tp2, atr } = ta;
+
+    const fmtP = v => v >= 1000 ? '$' + Math.round(v).toLocaleString() : '$' + v.toFixed(2);
+
+    // 趋势描述
+    const trendDesc =
+      chan.trend === 'strong_bull' ? '均线多头排列，趋势强势' :
+      chan.trend === 'strong_bear' ? '均线空头排列，趋势偏弱' :
+      chan.trend === 'mild_bull'   ? '短期均线偏多，中线待确认' :
+      chan.trend === 'mild_bear'   ? '短期均线偏空，结构偏弱' : '均线纠缠，方向不明';
+
+    // K线结构
+    const structDesc = chan.inPivot
+      ? `当前价格位于中枢区间 ${fmtP(chan.pivot.low)}–${fmtP(chan.pivot.high)} 内震荡`
+      : price > chan.pivot.high
+        ? `价格已突破中枢上沿 ${fmtP(chan.pivot.high)}，结构偏多`
+        : `价格跌破中枢下沿 ${fmtP(chan.pivot.low)}，结构偏弱`;
+
+    // MACD描述
+    const macdDesc = curHist > 0 && prevHist < 0 ? 'MACD刚形成金叉，动能转多' :
+                     curHist < 0 && prevHist > 0 ? 'MACD刚形成死叉，动能转空' :
+                     curHist > 0 && curHist > prevHist ? 'MACD柱持续扩张，多头动能增强' :
+                     curHist > 0 && curHist < prevHist ? 'MACD柱收窄，多头动能减弱' :
+                     curHist < 0 && curHist < prevHist ? 'MACD柱持续扩张，空头动能增强' :
+                     curHist < 0 && curHist > prevHist ? 'MACD柱收窄，空头动能减弱' : 'MACD中性';
+
+    // RSI描述
+    const rsiDesc = curRSI > 70 ? `RSI ${curRSI.toFixed(0)} 超买区，注意回调风险` :
+                    curRSI < 30 ? `RSI ${curRSI.toFixed(0)} 超卖区，关注反弹机会` :
+                    curRSI > 55 ? `RSI ${curRSI.toFixed(0)} 偏强` :
+                    curRSI < 45 ? `RSI ${curRSI.toFixed(0)} 偏弱` :
+                    `RSI ${curRSI.toFixed(0)} 中性`;
+
+    // 背驰
+    const beichiDesc = chan.beichi ? '⚠ 价格创新高但涨幅收窄，注意顶背驰风险。' : '';
+
+    // 支撑阻力文字
+    const supStr = supports.slice(0, 3).map(s => fmtP(s.price)).join(' / ') || '--';
+    const resStr = resistances.slice(0, 3).map(r => fmtP(r.price)).join(' / ') || '--';
+
+    // 操作建议
+    const opDesc =
+      signal === 'LONG'
+        ? `操作建议：不破 ${fmtP(sl)} 偏多思路，可轻仓布局，目标逐看 ${fmtP(tp1)}${tp2 ? ' → ' + fmtP(tp2) : ''}，止损 ${fmtP(sl)}。`
+        : signal === 'SHORT'
+        ? `操作建议：不破 ${fmtP(sl)} 偏空思路，反弹可轻仓做空，目标看 ${fmtP(tp1)}${tp2 ? ' → ' + fmtP(tp2) : ''}，止损 ${fmtP(sl)}。`
+        : `操作建议：方向不明，建议观望为主，等待结构明朗后再介入。`;
+
+    const signalTag = signal === 'LONG' ? '▲ 偏多' : signal === 'SHORT' ? '▼ 偏空' : '◆ 中性观望';
+
+    return {
+      signal, signalTag,
+      trendDesc, structDesc, macdDesc, rsiDesc, beichiDesc,
+      supStr, resStr, opDesc,
+      sl, tp1, tp2, fmtP,
+    };
+  }
+
+  return { analyze, generateText };
+})();
+
+window.realTA = realTA;
+
+// ── 快速分析弹窗 ─────────────────────────────────────────────────
+function openQuickAnalysis(coinKey) {
+  // 拿缓存数据
+  const res = window.dashResults?.[coinKey];
+  if (!res || res === 'loading' || !res.klines) {
+    alert('数据尚未加载完成，请等待推演结束后再试。');
+    return;
+  }
+
+  const { price, chg24, high, low, klines } = res;
+  const coin = window.dashCoins?.find(c => c.coin === coinKey);
+  const color = coin?.color || 'var(--gold)';
+  const tf = document.getElementById('fetchPeriod')?.value || '4h';
+  const tfLabel = tf === '1h' ? '1H' : tf === '4h' ? '4H' : tf === '1d' ? '1D' : tf.toUpperCase();
+
+  const ta  = realTA.analyze(coinKey, price, klines, chg24, high, low);
+  const txt = realTA.generateText(coinKey, price, ta, tfLabel);
+
+  if (!ta || !txt) { alert('分析失败，K线数据不足。'); return; }
+
+  const fmtP = txt.fmtP;
+  const signalColor = txt.signal === 'LONG' ? 'var(--bull)' : txt.signal === 'SHORT' ? 'var(--bear)' : 'var(--gold)';
+
+  // 玄学引擎摘要
+  const xuanScore  = res.score || '--';
+  const xuanBias   = res.avgBias != null ? ((res.avgBias * 100).toFixed(1) + '%') : '--';
+  const xuanTitle  = res.verdictTitle || '--';
+  const xuanHex    = res.ic?.hexagram?.[0] || (res.qm?.hexagram) || '䷀';
+  const xuanNodes  = (res.nodes || []).filter(n => new Date(n.date) > new Date()).slice(0, 3);
+  const xuanGann   = res.gn ? `江恩偏差 ${(res.gn.bias * 100).toFixed(1)}%` : '';
+  const xuanQM     = res.qm ? `奇门 ${res.qm.door || ''}` : '';
+  const xuanTpsl   = res.tpsl;
+
+  // 移除旧弹窗
+  document.getElementById('qaModal')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'qaModal';
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:9999;
+    background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
+    display:flex;align-items:center;justify-content:center;padding:16px;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      background:var(--card);border:1px solid var(--border2);border-radius:16px;
+      width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+      box-shadow:0 8px 40px rgba(0,0,0,.4);
+    ">
+      <!-- 标题栏 -->
+      <div style="
+        display:flex;align-items:center;justify-content:space-between;
+        padding:14px 18px 12px;border-bottom:1px solid var(--border);
+        background:linear-gradient(135deg,var(--card),var(--card2));
+        border-radius:16px 16px 0 0;position:sticky;top:0;z-index:2;
+      ">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-weight:800;font-size:1.05rem;color:${color};font-family:var(--font-mono)">${coinKey}</span>
+          <span style="font-size:.78rem;font-weight:700;font-family:var(--font-mono);color:var(--text)">${fmtP(price)}</span>
+          <span style="font-size:.7rem;color:${chg24>=0?'var(--bull)':'var(--bear)'};font-weight:700">${chg24>=0?'+':''}${Number(chg24).toFixed(2)}%</span>
+          <span style="font-size:.65rem;color:var(--faint)">· ${tfLabel}级别</span>
+        </div>
+        <button onclick="document.getElementById('qaModal').remove()"
+          style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.1rem;line-height:1;padding:4px 6px">✕</button>
+      </div>
+
+      <div style="padding:14px 18px;display:flex;flex-direction:column;gap:14px">
+
+        <!-- ══ 第一部分：真实技术分析 ══ -->
+        <div>
+          <div style="
+            font-size:.6rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--bull);margin-bottom:10px;display:flex;align-items:center;gap:6px
+          ">
+            <span style="display:inline-block;width:3px;height:12px;background:var(--bull);border-radius:2px"></span>
+            真实技术分析
+          </div>
+
+          <!-- 信号标签 -->
+          <div style="
+            display:inline-flex;align-items:center;gap:6px;
+            padding:6px 14px;border-radius:99px;margin-bottom:10px;
+            background:${signalColor}18;border:1px solid ${signalColor}40;
+          ">
+            <span style="font-size:.88rem;font-weight:800;color:${signalColor}">${txt.signalTag}</span>
+          </div>
+
+          <!-- 分析正文 -->
+          <div style="
+            background:var(--bg2);border:1px solid var(--border);border-radius:10px;
+            padding:12px 14px;font-size:.82rem;color:var(--text);line-height:1.9;
+          ">
+            <p style="margin:0 0 6px">${txt.structDesc}。${txt.trendDesc}，${volDesc(ta)}。</p>
+            <p style="margin:0 0 6px">${txt.macdDesc}；${txt.rsiDesc}。</p>
+            ${txt.beichiDesc ? `<p style="margin:0 0 6px;color:var(--bear)">${txt.beichiDesc}</p>` : ''}
+            <p style="margin:0">${txt.opDesc}</p>
+          </div>
+
+          <!-- 支撑阻力表 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+            <div style="background:var(--bull-bg);border:1px solid var(--bull-bd);border-radius:9px;padding:9px 12px">
+              <div style="font-size:.58rem;font-weight:700;color:var(--bull);letter-spacing:.06em;margin-bottom:4px">▲ 上方阻力</div>
+              <div style="font-size:.78rem;font-weight:700;font-family:var(--font-mono);color:var(--text);line-height:1.7">${txt.resStr}</div>
+            </div>
+            <div style="background:var(--bear-bg);border:1px solid var(--bear-bd);border-radius:9px;padding:9px 12px">
+              <div style="font-size:.58rem;font-weight:700;color:var(--bear);letter-spacing:.06em;margin-bottom:4px">▼ 下方支撑</div>
+              <div style="font-size:.78rem;font-weight:700;font-family:var(--font-mono);color:var(--text);line-height:1.7">${txt.supStr}</div>
+            </div>
+          </div>
+
+          <!-- TP/SL -->
+          <div style="
+            display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;
+            background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+          ">
+            <div style="text-align:center">
+              <div style="font-size:.58rem;color:var(--faint);margin-bottom:3px">止损</div>
+              <div style="font-size:.8rem;font-weight:800;font-family:var(--font-mono);color:var(--bear)">${fmtP(txt.sl)}</div>
+              <div style="font-size:.58rem;color:var(--bear)">${((Math.abs(txt.sl-price)/price)*100).toFixed(1)}%</div>
+            </div>
+            <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+              <div style="font-size:.58rem;color:var(--faint);margin-bottom:3px">TP1</div>
+              <div style="font-size:.8rem;font-weight:800;font-family:var(--font-mono);color:var(--bull)">${fmtP(txt.tp1)}</div>
+              <div style="font-size:.58rem;color:var(--bull)">+${((Math.abs(txt.tp1-price)/price)*100).toFixed(1)}%</div>
+            </div>
+            <div style="text-align:center">
+              <div style="font-size:.58rem;color:var(--faint);margin-bottom:3px">TP2</div>
+              <div style="font-size:.8rem;font-weight:800;font-family:var(--font-mono);color:var(--bull)">${fmtP(txt.tp2)}</div>
+              <div style="font-size:.58rem;color:var(--bull)">+${((Math.abs(txt.tp2-price)/price)*100).toFixed(1)}%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分隔线 -->
+        <div style="border-top:1px dashed var(--border2);position:relative">
+          <span style="
+            position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+            background:var(--card);padding:0 10px;
+            font-size:.62rem;color:var(--faint);font-weight:700;letter-spacing:.06em
+          ">玄学系统推算</span>
+        </div>
+
+        <!-- ══ 第二部分：玄学系统 ══ -->
+        <div>
+          <div style="
+            font-size:.6rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+            color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:6px
+          ">
+            <span style="display:inline-block;width:3px;height:12px;background:var(--gold);border-radius:2px"></span>
+            玄学十法合一
+          </div>
+
+          <!-- 综合评分 + 卦象 -->
+          <div style="
+            display:flex;align-items:center;gap:14px;
+            background:var(--gold-bg);border:1px solid var(--gold-bd);
+            border-radius:10px;padding:12px 14px;margin-bottom:8px
+          ">
+            <div style="text-align:center;flex-shrink:0">
+              <div style="font-size:2rem;font-weight:900;font-family:var(--font-mono);
+                color:${xuanScore>=65?'var(--bull)':xuanScore<=35?'var(--bear)':'var(--gold)'}">${xuanScore}</div>
+              <div style="font-size:.58rem;color:var(--faint)">玄学评分</div>
+            </div>
+            <div style="width:1px;height:40px;background:var(--border2)"></div>
+            <div style="flex:1">
+              <div style="font-size:1.1rem;color:var(--gold2)">${typeof xuanHex==='string'?xuanHex:'䷀'}</div>
+              <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-top:2px">${xuanTitle}</div>
+              <div style="font-size:.68rem;color:var(--muted);margin-top:2px">
+                偏差 ${xuanBias}
+                ${xuanGann ? ' · ' + xuanGann : ''}
+                ${xuanQM   ? ' · ' + xuanQM   : ''}
+              </div>
+            </div>
+          </div>
+
+          <!-- 玄学节点 -->
+          ${xuanNodes.length ? `
+          <div style="display:flex;flex-direction:column;gap:5px">
+            ${xuanNodes.map(n => {
+              const d = new Date(n.date);
+              const diff = Math.round((d - Date.now()) / 86400000);
+              const col = n.isBull ? 'var(--bull)' : 'var(--bear)';
+              return `<div style="
+                display:flex;align-items:center;gap:10px;padding:7px 12px;
+                background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+              ">
+                <span style="font-size:.75rem;font-weight:800;color:${col};font-family:var(--font-mono);width:40px;flex-shrink:0">
+                  ${(d.getMonth()+1)}/${d.getDate()}
+                </span>
+                <span style="font-size:.7rem;font-weight:700;color:${col}">${n.isBull?'▲':'▼'} ${n.type}</span>
+                <span style="font-size:.62rem;color:var(--faint);margin-left:auto">+${diff}天</span>
+              </div>`;
+            }).join('')}
+          </div>` : `<div style="font-size:.72rem;color:var(--faint);text-align:center;padding:8px">暂无玄学关键节点</div>`}
+
+          <!-- 免责 -->
+          <div style="font-size:.58rem;color:var(--faint);text-align:center;margin-top:8px">
+            ⚠ 玄学推算仅供参考，不构成投资建议
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+// 辅助：成交量描述
+function volDesc(ta) {
+  return ta.volRatio > 1.5 ? `成交量放大（${ta.volRatio.toFixed(1)}x均量），走势有效性较强` :
+         ta.volRatio < 0.6 ? `成交量萎缩（${ta.volRatio.toFixed(1)}x均量），信号可信度偏低` :
+         `成交量正常（${ta.volRatio.toFixed(1)}x均量）`;
+}
+
+window.openQuickAnalysis = openQuickAnalysis;
+console.log('✅ 真实技术分析引擎就绪');
