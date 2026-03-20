@@ -941,6 +941,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
 /* ── Spinner ── */
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
 .spinner {
   display: inline-block; width: 11px; height: 11px;
   border: 2px solid var(--border2); border-top-color: var(--gold);
