@@ -964,17 +964,22 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   .mob-menu-btn { display: none !important; }
 }
 
-/* Mobile */
+/* Mobile — iOS 固定布局，完全避开 flexbox 高度计算 */
 @media (max-width: 767px) {
-  html { height: -webkit-fill-available; }
-  body { overflow: hidden; min-height: -webkit-fill-available; -webkit-overflow-scrolling: touch; }
+  html, body { height: 100%; overflow: hidden; }
 
-  .app { flex-direction: column; height: 100vh; height: -webkit-fill-available; overflow: hidden; }
+  /* App shell: fixed full screen */
+  .app {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
   /* Sidebar → bottom drawer */
   .sidebar {
     position: fixed !important;
-    top:auto;right:0;bottom:0;left:0 !important;
+    top: auto; left: 0; right: 0; bottom: 0;
     width: 100% !important; min-width: 0 !important;
     height: auto; max-height: 86vh;
     border-right: none; border-top: 1px solid var(--border2);
@@ -992,9 +997,24 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
     width: 40px; height: 4px; border-radius: 2px; background: var(--border3);
   }
 
-  /* Main */
-  .main { flex: 1; width: 100%; min-height: 0; overflow: hidden; }
-  .dashboard { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
+  /* Main: fill remaining space */
+  .main {
+    flex: 1;
+    width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Dashboard: fill main, column flex */
+  .dashboard {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
 
   /* Topbar compact */
   .topbar { height: 50px; padding: 0 12px; gap: 8px; }
@@ -1021,19 +1041,26 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   .filter-bar::-webkit-scrollbar { display: none; }
   .filter-right, .filter-label { display: none !important; }
 
-  /* Table wrap */
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; min-height: 0; position: relative; }
+  /* Table wrap: the only scrollable area */
+  .table-wrap {
+    flex: 1;
+    overflow-y: scroll; /* scroll not auto — more reliable on iOS */
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    min-height: 0;
+    position: relative;
+  }
 
   /* ALWAYS hide table on mobile */
   table.coin-tbl, #coinTbl { display: none !important; }
 
-  /* ALWAYS show card list (empty = hidden by :empty) */
+  /* ALWAYS show card list */
   #coinCardList {
     display: block !important;
-    padding: 8px 12px 90px;
-    position: relative; z-index: 10;
-    min-height: 10px;
-    -webkit-overflow-scrolling: touch;
+    padding: 8px 12px 100px;
+    min-height: 1px;
+    width: 100%;
+    box-sizing: border-box;
   }
   #coinCardList:empty { display: none !important; }
 
