@@ -8144,7 +8144,7 @@ async function runDashboard() {
         const avgBias1 = active1.length ? active1.reduce((s,e)=>s+(e.bias||0),0)/active1.length : 0;
         const score1 = Math.round((avgBias1+1)/2*100);
         const titles = ['天地否塞·空头','阴云密布·偏空','中性徘徊','温和向上·偏多','天时地利·强多'];
-        dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, price, chg24, high, low, score:score1, avgBias:avgBias1, avgConf:.5, verdictTitle:titles[score1>=80?4:score1>=60?3:score1>=45?2:score1>=30?1:0], _partial:true };
+        dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, price, chg24, high, low, score:score1, avgBias:avgBias1, avgConf:.5, verdictTitle:titles[score1>=80?4:score1>=60?3:score1>=45?2:score1>=30?1:0], klines, _partial:true };
         try { renderCoinTable(); } catch(e) {}
         try { if (typeof renderCoinCards==='function') renderCoinCards(); } catch(_e) {}
 
@@ -20113,8 +20113,12 @@ window.realTA = realTA;
 function openQuickAnalysis(coinKey) {
   // 拿缓存数据
   const res = window.dashResults?.[coinKey];
-  if (!res || res === 'loading' || !res.klines) {
-    alert('数据尚未加载完成，请等待推演结束后再试。');
+  if (!res || res === 'loading') {
+    alert('数据尚未加载，请先点击「一键通·全自动推演」。');
+    return;
+  }
+  if (!res.klines) {
+    alert('K线数据加载中，请等待10秒后再试。');
     return;
   }
 
