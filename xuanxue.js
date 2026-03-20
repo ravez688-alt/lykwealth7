@@ -13166,22 +13166,16 @@ function renderCoinCards() {
   const results = window.dashResults || {};
   const hasAny  = coins.some(c => results[c.coin] && results[c.coin] !== 'loading');
 
-  // CSS controls mobile/desktop visibility via media queries.
-  // On desktop: #coinCardList is hidden by CSS (display:none in .coin-card-list rule).
-  // On mobile:  table#coinTbl is hidden by CSS, #coinCardList:empty hides when no data.
-  // JS only manages welcome screen and writes innerHTML — no display toggling here.
-
-    const tblEl   = document.getElementById('coinTbl');
-
   if (!hasAny) {
     listEl.innerHTML = '';
-    listEl.style.removeProperty('display'); // let CSS :empty rule handle hiding
+    listEl.style.removeProperty('display');
     return;
   }
 
-  // Have data: hide welcome, FORCE card list visible
+  // Have data — make sure list is visible
   document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
-  listEl.style.removeProperty('display'); // remove any inline override, let CSS !important take over
+  listEl.style.removeProperty('display');
+  listEl.style.setProperty('display', 'block', 'important');
   listEl.style.padding = '8px 12px 90px';
 
   const fmtP = v => {
