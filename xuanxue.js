@@ -13455,17 +13455,7 @@ function applyWeights() {
 
 // 注入权重按钮到详情页工具栏
 (function injectWeightBtn() {
-  document.addEventListener('DOMContentLoaded', () => {
-    const toolbar = document.querySelector('#detailView .detail-body')?.previousElementSibling
-      ?.querySelector('[style*="margin-left:auto"]');
-    if (toolbar) {
-      const btn = document.createElement('button');
-      btn.className = 'extra-btn';
-      btn.textContent = '⚖️ 权重';
-      btn.onclick = openWeightModal;
-      toolbar.insertBefore(btn, toolbar.firstChild);
-    }
-  });
+
 })();
 
 
@@ -14105,15 +14095,7 @@ document.addEventListener('DOMContentLoaded', () => {
     topbarRight.appendChild(optBtn);
   }
 
-  // Also inject weight btn in detail bar
-  const detailBtns = document.querySelector('#detailView [style*="margin-left:auto"]');
-  if (detailBtns && !detailBtns.querySelector('[onclick*="openWeightModal"]')) {
-    const wBtn = document.createElement('button');
-    wBtn.className = 'extra-btn';
-    wBtn.textContent = '⚖️ 权重';
-    wBtn.onclick = openWeightModal;
-    detailBtns.insertBefore(wBtn, detailBtns.firstChild);
-  }
+
 });
 
 // ═══════════════════════════════════════════════════════
