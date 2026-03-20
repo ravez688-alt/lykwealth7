@@ -527,7 +527,7 @@ body {
   align-items: center; justify-content: center;
   gap: 12px; padding: 40px; text-align: center;
   /* Absolute so it never pushes table out of flow */
-  position: absolute; inset: 0; z-index: 5;
+  position: absolute; top:0;right:0;bottom:0;left:0; z-index: 5;
   background: var(--bg);
   pointer-events: none;
 }
@@ -682,7 +682,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   width: 148px; height: 148px; flex-shrink: 0;
 }
 .score-center {
-  position: absolute; inset: 0;
+  position: absolute; top:0;right:0;bottom:0;left:0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; text-align: center;
 }
@@ -854,7 +854,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
 /* ── Modals ── */
 .modal-overlay {
-  position: fixed; inset: 0; z-index: 9999;
+  position: fixed; top:0;right:0;bottom:0;left:0; z-index: 9999;
   background: rgba(0,0,0,.7);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   display: flex; align-items: center; justify-content: center;
@@ -878,7 +878,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
 /* ── Loading overlay ── */
 .loading-overlay {
-  position: fixed; inset: 0; z-index: 999;
+  position: fixed; top:0;right:0;bottom:0;left:0; z-index: 999;
   background: rgba(10,11,15,.95);
   -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
   display: none; flex-direction: column;
@@ -944,7 +944,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 /* Sidebar backdrop */
 .sidebar-backdrop {
   display: none;
-  position: fixed; inset: 0; z-index: 299;
+  position: fixed; top:0;right:0;bottom:0;left:0; z-index: 299;
   background: rgba(0,0,0,.55);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
 }
@@ -967,14 +967,14 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 /* Mobile */
 @media (max-width: 767px) {
   html { height: -webkit-fill-available; }
-  body { overflow: hidden; min-height: -webkit-fill-available; }
+  body { overflow: hidden; min-height: -webkit-fill-available; -webkit-overflow-scrolling: touch; }
 
-  .app { flex-direction: column; height: 100vh; height: -webkit-fill-available; }
+  .app { flex-direction: column; height: 100vh; height: -webkit-fill-available; overflow: hidden; }
 
   /* Sidebar → bottom drawer */
   .sidebar {
     position: fixed !important;
-    inset: auto 0 0 0 !important;
+    top:auto;right:0;bottom:0;left:0 !important;
     width: 100% !important; min-width: 0 !important;
     height: auto; max-height: 86vh;
     border-right: none; border-top: 1px solid var(--border2);
@@ -994,7 +994,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 
   /* Main */
   .main { flex: 1; width: 100%; min-height: 0; overflow: hidden; }
-  .dashboard { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .dashboard { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; position: relative; }
 
   /* Topbar compact */
   .topbar { height: 50px; padding: 0 12px; gap: 8px; }
@@ -1022,7 +1022,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   .filter-right, .filter-label { display: none !important; }
 
   /* Table wrap */
-  .table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; min-height: 0; position: relative; }
 
   /* ALWAYS hide table on mobile */
   table.coin-tbl, #coinTbl { display: none !important; }
@@ -1031,7 +1031,9 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   #coinCardList {
     display: block !important;
     padding: 8px 12px 90px;
-    position: relative; z-index: 10;  /* above welcome overlay */
+    position: relative; z-index: 10;
+    min-height: 10px;
+    -webkit-overflow-scrolling: touch;
   }
   #coinCardList:empty { display: none !important; }
 
