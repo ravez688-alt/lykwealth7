@@ -1676,7 +1676,7 @@ function closeMobileSidebar() {
     if (e.changedTouches[0].clientY - startY > 70) closeMobileSidebar();
   }, {passive:true});
 })();
-/* renderCoinCards hook — runs after all scripts load */
+/* renderCoinCards hook + mobile polling */
 window.addEventListener('load', function() {
   var _orig = window.renderCoinTable || (typeof renderCoinTable !== 'undefined' ? renderCoinTable : null);
   if (typeof _orig === 'function') {
@@ -1686,8 +1686,35 @@ window.addEventListener('load', function() {
     };
     console.log('[Mobile] renderCoinCards hook installed');
   }
-  // Also do an initial render
+  // Initial render
   try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_){}
+
+  // Mobile polling: every 500ms check if data arrived but cards not rendered
+  var _pollCount = 0;
+  var _poller = setInterval(function() {
+    _pollCount++;
+    if (_pollCount > 60) { clearInterval(_poller); return; } // stop after 30s
+    try {
+      var results = window.dashResults || {};
+      var coins   = window.dashCoins   || [];
+      var cardList = document.getElementById('coinCardList');
+      if (!cardList) return;
+      // If we have data but cards are empty — force render
+      var hasData = coins.some(function(c) {
+        return results[c.coin] && results[c.coin] !== 'loading' && results[c.coin].price;
+      });
+      if (hasData && cardList.children.length === 0) {
+        console.log('[Poller] Data ready but cards empty — forcing render #' + _pollCount);
+        cardList.style.removeProperty('display');
+        if (typeof renderCoinCards === 'function') renderCoinCards();
+      }
+      // Stop polling once cards are rendered
+      if (cardList.children.length > 0) {
+        console.log('[Poller] Cards rendered OK, stopping poller');
+        clearInterval(_poller);
+      }
+    } catch(e) { console.warn('[Poller] error:', e.message); }
+  }, 500);
 });
 </script>
 
