@@ -17426,7 +17426,7 @@ window.showSimilarCases = function(currentResult) {
     </div>`).join('');
   // 复用案例渲染到弹窗
   const overlay = document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:center;justify-content:center';
+  overlay.style.cssText='position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:center;justify-content:center';
   overlay.innerHTML=`<div style="background:var(--card);border-radius:14px;padding:20px;max-width:340px;width:95vw;max-height:80vh;overflow-y:auto">
     <div style="display:flex;justify-content:space-between;margin-bottom:12px">
       <b>📚 历史相似案例</b>
@@ -19558,7 +19558,7 @@ function openBriefingModal() {
 
   const modal = document.createElement('div');
   modal.id = 'briefingModal';
-  modal.style.cssText = `position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,.55);
+  modal.style.cssText = `position:fixed;top:0;right:0;bottom:0;left:0;z-index:10002;background:rgba(0,0,0,.55);
     display:flex;align-items:center;justify-content:center;padding:16px;`;
   modal.innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;
@@ -20152,7 +20152,7 @@ function openQuickAnalysis(coinKey) {
   const modal = document.createElement('div');
   modal.id = 'qaModal';
   modal.style.cssText = `
-    position:fixed;inset:0;z-index:9999;
+    position:fixed;top:0;right:0;bottom:0;left:0;z-index:9999;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);
     display:flex;align-items:center;justify-content:center;padding:16px;
   `;
