@@ -1808,6 +1808,20 @@ if (location.search.includes('debug=1')) {
   dbg.appendChild(info);
 
   dlog('Debug mode ON — iOS ' + (navigator.userAgent.match(/OS ([\d_]+)/) || ['','?'])[1]);
+  dlog('SES active: ' + (typeof lockdown !== 'undefined' ? 'YES' : 'NO'));
+  
+  // Monitor dashResults
+  setInterval(function() {
+    var results = window.dashResults || {};
+    var coins = window.dashCoins || [];
+    var filled = coins.filter(function(c) { 
+      return results[c.coin] && results[c.coin] !== 'loading' && results[c.coin].price; 
+    }).length;
+    document.getElementById('_dbgCardInfo').textContent = 
+      'cards:' + (document.getElementById('coinCardList') || {}).children.length +
+      ' results:' + filled + '/' + coins.length +
+      ' display:' + (window.getComputedStyle(document.getElementById('coinCardList') || document.body).display);
+  }, 1000);
 }
 </script>
 
