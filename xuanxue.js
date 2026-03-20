@@ -7431,6 +7431,9 @@ const DASHBOARD_COINS = [
 let dashCoins = [...DASHBOARD_COINS]; // mutable list
 let dashResults = {};   // coin → result data
 let selectedCoin = null;
+// Expose to window so debug tools and mobile pollers can access
+window.dashCoins   = dashCoins;
+window.dashResults = dashResults;
 
 // ── Coin list sidebar renderer ────────────────────────────────────────────
 // ── Coin list: left panel rows ────────────────────────────────────────────
@@ -8148,15 +8151,18 @@ async function runDashboard() {
         const span     = parseFloat(document.getElementById('span').value) || 90;
         const currentTF = document.getElementById('fetchPeriod').value || '4h';
 
-        // ── Phase 1: Fast engines — use analysisDate so historic dates get historic metaphysics ──
-        const qm = sys.qimen   ? engineQiMen(c.coin, analysisDate)                              : null;
-        const ic = sys.iching  ? engineIChing(c.coin, analysisDate)                              : null;
-        const ve = sys.vedic   ? engineVedic(c.coin, analysisDate)                              : null;
-        const gn = sys.gann    ? engineGann(c.coin, analysisDate, price, high, low)             : null;
-        const sr = sys.sr      ? engineSR(c.coin, analysisDate, price, high, low)               : null;
-        const ch = sys.chan    ? engineChan(c.coin, analysisDate, price, high, low, breakLvl)   : null;
-        const rsiE  = engineRSI(c.coin, analysisDate, price, high, low, klines);
-        const macdE = engineMACD(c.coin, analysisDate, price, high, low, klines);
+        console.log('[Engine] 开始分析', c.coin, '$' + price);
+
+        // ── Phase 1: Fast engines ──
+        const qm = sys.qimen   ? (()=>{try{return engineQiMen(c.coin, analysisDate);}catch(e){console.error('[qm]',e.message);return null;}})()   : null;
+        const ic = sys.iching  ? (()=>{try{return engineIChing(c.coin, analysisDate);}catch(e){console.error('[ic]',e.message);return null;}})()   : null;
+        const ve = sys.vedic   ? (()=>{try{return engineVedic(c.coin, analysisDate);}catch(e){console.error('[ve]',e.message);return null;}})()   : null;
+        const gn = sys.gann    ? (()=>{try{return engineGann(c.coin, analysisDate, price, high, low);}catch(e){console.error('[gn]',e.message);return null;}})()    : null;
+        const sr = sys.sr      ? (()=>{try{return engineSR(c.coin, analysisDate, price, high, low);}catch(e){console.error('[sr]',e.message);return null;}})()      : null;
+        const ch = sys.chan    ? (()=>{try{return engineChan(c.coin, analysisDate, price, high, low, breakLvl);}catch(e){console.error('[ch]',e.message);return null;}})() : null;
+        const rsiE  = (()=>{try{return engineRSI(c.coin, analysisDate, price, high, low, klines);}catch(e){console.error('[rsi]',e.message);return null;}})();
+        const macdE = (()=>{try{return engineMACD(c.coin, analysisDate, price, high, low, klines);}catch(e){console.error('[macd]',e.message);return null;}})();
+        console.log('[Engine]', c.coin, 'Phase1 OK qm=', !!qm, 'gn=', !!gn, 'rsi=', !!rsiE);
         const active1 = [qm,ic,ve,gn,sr,ch].filter(Boolean);
         const avgBias1 = active1.length ? active1.reduce((s,e)=>s+(e.bias||0),0)/active1.length : 0;
         const score1 = Math.round((avgBias1+1)/2*100);
