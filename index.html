@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="天機數元">
+<meta name="theme-color" content="#0a0b0f">
+<link rel="manifest" href="/manifest.json">
 <title>天機數元 · 十法合一</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1730,12 +1734,6 @@ window.addEventListener('load', function() {
     try {
       console.log('[AutoRun] 页面加载完成，自动开始推演…');
 
-      // Show a status message so user knows something is happening
-      var scanTxt = document.getElementById('scanStatusText');
-      var scanBar = document.getElementById('scanStatusBar');
-      if (scanBar) scanBar.style.display = 'flex';
-      if (scanTxt) scanTxt.textContent = '正在自动抓取行情…';
-
       // Try oneClick (full pipeline with smart learning)
       if (window.oneClick && typeof window.oneClick.runAll === 'function' && !window.oneClick.running) {
         // Set mode to quick so it runs faster on load
@@ -1762,5 +1760,15 @@ window.addEventListener('load', function() {
 
 
 
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw.js')
+      .then(function(reg) { console.log('SW registered'); })
+      .catch(function(e) { console.log('SW failed:', e); });
+  });
+}
+</script>
 </body>
 </html>
