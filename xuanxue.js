@@ -8262,6 +8262,19 @@ async function runDashboard() {
     document.querySelectorAll('.welcome').forEach(el => { el.style.display = 'none'; });
     renderCoinTable();
     try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
+
+    // iOS Safari 强制重绘 — 解决 iOS 不渲染已填充内容的 bug
+    const cardList = document.getElementById('coinCardList');
+    if (cardList && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      cardList.style.display = 'none';
+      cardList.offsetHeight; // force reflow
+      cardList.style.display = 'block';
+      // 二次触发，确保 iOS 26 也能渲染
+      setTimeout(() => {
+        try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
+        cardList.style.webkitTransform = 'translateZ(0)';
+      }, 100);
+    }
   }
 }
 // 显式挂载到 window（供其他模块使用）
