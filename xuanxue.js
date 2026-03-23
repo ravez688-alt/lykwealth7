@@ -7113,6 +7113,8 @@ const COMPARE_COINS = [
   { sym: 'ETHUSDT', coin: 'ETH', label: 'Ethereum', color: '#627eea' },
   { sym: 'SOLUSDT', coin: 'SOL', label: 'Solana',   color: '#9945ff' },
   { sym: 'BNBUSDT',  coin: 'BNB',  label: 'BNB',       color: '#f3ba2f' },
+  { sym: 'XRPUSDT',  coin: 'XRP',  label: 'XRP',       color: '#00aae4' },
+  { sym: 'DOGEUSDT', coin: 'DOGE', label: 'Dogecoin',  color: '#c2a633' },
 ];
 
 async function fetchMultiCoin() {
@@ -7518,6 +7520,8 @@ const DASHBOARD_COINS = [
   { sym:'ETHUSDT',  coin:'ETH',  label:'Ethereum', color:'#627eea' },
   { sym:'SOLUSDT',  coin:'SOL',  label:'Solana',   color:'#9945ff' },
   { sym:'BNBUSDT',  coin:'BNB',  label:'BNB',      color:'#f3ba2f' },
+  { sym:'XRPUSDT',  coin:'XRP',  label:'XRP',      color:'#00aae4' },
+  { sym:'DOGEUSDT', coin:'DOGE', label:'Dogecoin',  color:'#c2a633' },
 
   // 大宗商品 — 实时价格 via gold-api
   { coin:'XAU',  label:'黄金',  color:'#d4a030', manual:true, natalKey:'GOLD'  },
@@ -13167,8 +13171,8 @@ function updateStratOptPanel() {
   // ── 多币对比区（BTC/ETH/SOL/BNB）────────────────────────────────────────
   const compareBody = g('multiCoinCompareBody');
   if (compareBody) {
-    const COMPARE_COINS = ['BTC','ETH','SOL','BNB'];
-    const coinColors = { BTC:'#f7931a', ETH:'#627eea', SOL:'#9945ff', BNB:'#f0b90b' };
+    const COMPARE_COINS = ['BTC','ETH','SOL','BNB','XRP','DOGE'];
+    const coinColors = { BTC:'#f7931a', ETH:'#627eea', SOL:'#9945ff', BNB:'#f0b90b', XRP:'#00aae4', DOGE:'#c2a633' };
     const validCoins = COMPARE_COINS
       .map(c => dashResults[c] && dashResults[c] !== 'loading' && dashResults[c].price ? dashResults[c] : null)
       .filter(Boolean);
