@@ -1,22 +1,4 @@
-/**
- * ╔══════════════════════════════════════════════════════════════════╗
- * ║  天機數元 · 量化引擎升级包 v3.0                                      ║
- * ║  精确对标 FINCH v44 · 全量化深度                                      ║
- * ║                                                                  ║
- * ║  ✅ RSI/MACD 背离检测      ✅ Supertrend ATR=3×10                 ║
- * ║  ✅ ADX 趋势强度            ✅ Ichimoku 一目均衡                    ║
- * ║  ✅ Vegas EMA144/169        ✅ BOS/CHoCH 市场结构                  ║
- * ║  ✅ CVD 累计量价差           ✅ OBV 量能背驰                        ║
- * ║  ✅ 历史波动率 HV20          ✅ MTF 多时框对齐                      ║
- * ║  ✅ K线形态识别              ✅ Volume Profile + POC               ║
- * ║  ✅ 资金费率 Funding Rate    ✅ Open Interest                      ║
- * ║  ✅ 置信度柱子评分 Grade A-D ✅ FINCH风格 Verdict Card             ║
- * ║  ✅ 综合入场论据强度          ✅ 多时框一致性阵列                     ║
- * ╚══════════════════════════════════════════════════════════════════╝
- *
- *  <script src="xuanxue.js"></script>
- *  <script src="xuanxue_quant.js"></script>
- */
+
 
 (function(global) {
 'use strict';
@@ -24,9 +6,6 @@
 if (global._QUANT_LOADED) { return; }
 global._QUANT_LOADED = true;
 
-// ════════════════════════════════════════════════════════════════
-// §0  K线标准化（兼容数组/对象双格式）
-// ════════════════════════════════════════════════════════════════
 const _o=k=>parseFloat(k[1]!==undefined?k[1]:k.o);
 const _h=k=>parseFloat(k[2]!==undefined?k[2]:k.h);
 const _l=k=>parseFloat(k[3]!==undefined?k[3]:k.l);
@@ -39,9 +18,6 @@ function norm(kl) {
   return kl.map(k=>({o:_o(k),h:_h(k),l:_l(k),c:_c(k),v:_v(k),t:_t(k)}));
 }
 
-// ════════════════════════════════════════════════════════════════
-// §1  基础数学
-// ════════════════════════════════════════════════════════════════
 function calcMA(p,n){const o=new Array(p.length).fill(null);for(let i=n-1;i<p.length;i++){let s=0;for(let j=0;j<n;j++)s+=p[i-j];o[i]=s/n;}return o;}
 function calcEMA(p,n){const k=2/(n+1);let e=p[0];const o=[e];for(let i=1;i<p.length;i++){e=p[i]*k+e*(1-k);o.push(e);}return o;}
 function calcRSIArr(p,n=14){if(p.length<n+1)return new Array(p.length).fill(null);let ag=0,al=0;for(let i=1;i<=n;i++){const d=p[i]-p[i-1];d>0?ag+=d:al-=d;}ag/=n;al/=n;const o=new Array(n).fill(null);o.push(al===0?100:100-100/(1+ag/al));for(let i=n+1;i<p.length;i++){const d=p[i]-p[i-1];ag=(ag*(n-1)+Math.max(d,0))/n;al=(al*(n-1)+Math.max(-d,0))/n;o.push(al===0?100:100-100/(1+ag/al));}return o;}
@@ -50,9 +26,6 @@ function calcATR(kl,n=14){if(!kl||kl.length<n+1)return 0;const trs=kl.slice(1).m
 function calcBB(p,n=20,m=2){const last=p.length-1;if(last<n-1)return{upper:0,lower:0,mid:0,pos:0.5,std:0};const sl=p.slice(last-n+1,last+1),mean=sl.reduce((a,b)=>a+b,0)/n,std=Math.sqrt(sl.reduce((s,v)=>s+(v-mean)**2,0)/n);const upper=mean+m*std,lower=mean-m*std;return{upper,lower,mid:mean,pos:upper===lower?0.5:(p[last]-lower)/(upper-lower),std};}
 function calcStdDev(arr){const m=arr.reduce((a,b)=>a+b,0)/arr.length;return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length);}
 
-// ════════════════════════════════════════════════════════════════
-// §2  MACD + 背离（精确移植 FINCH）
-// ════════════════════════════════════════════════════════════════
 function calcMACDFull(p) {
   const e12=calcEMA(p,12),e26=calcEMA(p,26);
   const macdLine=p.map((_,i)=>e12[i]!==null&&e26[i]!==null?e12[i]-e26[i]:null);
@@ -81,9 +54,6 @@ function calcMACDFull(p) {
   return{macd:lastM,signal:lastS,hist:lastH,bullDiv,bearDiv,histArr:hist,macdLine};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §3  ADX（精确移植 FINCH §_Φ5a）
-// ════════════════════════════════════════════════════════════════
 function calcADX(kl,n=14){
   if(!kl||kl.length<n*2+2)return{adx:20,pdi:0,ndi:0,trending:false,strong:false,ranging:true};
   try{
@@ -105,9 +75,6 @@ function calcADX(kl,n=14){
   }catch(e){return{adx:20,pdi:0,ndi:0,trending:false,strong:false,ranging:true};}
 }
 
-// ════════════════════════════════════════════════════════════════
-// §4  Supertrend（精确移植 FINCH §_Σ1t）
-// ════════════════════════════════════════════════════════════════
 function calcSupertrend(kl,mult=3,atrP=10){
   if(!kl||kl.length<atrP+2)return{signal:'neutral',value:0,bull:false,bear:false};
   try{
@@ -125,9 +92,6 @@ function calcSupertrend(kl,mult=3,atrP=10){
   }catch(e){return{signal:'neutral',value:0,bull:false,bear:false};}
 }
 
-// ════════════════════════════════════════════════════════════════
-// §5  Ichimoku（精确移植 FINCH）
-// ════════════════════════════════════════════════════════════════
 function calcIchimoku(kl){
   if(!kl||kl.length<52)return null;
   try{
@@ -143,9 +107,6 @@ function calcIchimoku(kl){
   }catch(e){return null;}
 }
 
-// ════════════════════════════════════════════════════════════════
-// §6  Vegas Channel EMA144/169（精确移植 FINCH）
-// ════════════════════════════════════════════════════════════════
 function calcVegas(kl){
   if(!kl||kl.length<170)return null;
   const p=kl.map(k=>k.c),n=p.length;
@@ -155,9 +116,6 @@ function calcVegas(kl){
   return{e144:v144,e169:v169,above:price>Math.max(v144,v169),below:price<Math.min(v144,v169),inside:price>=Math.min(v144,v169)&&price<=Math.max(v144,v169),bullCross:v144>v169,midpoint:(v144+v169)/2};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §7  OBV（精确移植 FINCH §_Ψ6o）
-// ════════════════════════════════════════════════════════════════
 function calcOBV(kl){
   if(!kl||kl.length<10)return{obvTrend:0,obvDiv:false,obv:0,score:0};
   let obv=0;const arr=[0];
@@ -172,9 +130,6 @@ function calcOBV(kl){
   return{obvTrend,obvDiv,obv:arr[n-1],score,obvArr:arr};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §8  CVD 累计量价差（精确移植 FINCH §_Π2d）
-// ════════════════════════════════════════════════════════════════
 function calcCVD(kl){
   if(!kl||kl.length<5)return{cvd:0,cvdTrend:0,bullishDelta:false,diverging:false};
   let cvd=0;const arr=[];
@@ -183,9 +138,6 @@ function calcCVD(kl){
   return{cvd:arr[n-1],cvdTrend,bullishDelta:cvdTrend===1,diverging:cvdTrend!==priceTrend,cvdArr:arr};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §9  历史波动率 HV20
-// ════════════════════════════════════════════════════════════════
 function calcHV(p,n=20){
   if(!p||p.length<n+1)return{hv:0,expanding:false,contracting:false,ratio:1};
   const logR=[];for(let i=1;i<p.length;i++){if(p[i]>0&&p[i-1]>0)logR.push(Math.log(p[i]/p[i-1]));}
@@ -198,9 +150,6 @@ function calcHV(p,n=20){
   return{hv,expanding:hv>hvOld*1.1,contracting:hv<hvOld*0.9,ratio:hvOld>0?hv/hvOld:1};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §10  市场结构 BOS/CHoCH（精确移植 FINCH）
-// ════════════════════════════════════════════════════════════════
 function findSwings(kl,lb=3){
   const n=kl.length,peaks=[],troughs=[];
   if(n<lb*2+2)return{peaks,troughs};
@@ -225,9 +174,6 @@ function calcMktStr(kl){
   }catch(e){return{bias:'neutral',bosScore:0,structureScore:0,hhhl:false,lllh:false};}
 }
 
-// ════════════════════════════════════════════════════════════════
-// §11  Stoch RSI
-// ════════════════════════════════════════════════════════════════
 function calcStochRSI(kl,rP=14,sP=14){
   if(!kl||kl.length<rP+sP+5)return{k:50,d:50,bullCross:false,bearCross:false};
   const p=kl.map(k=>k.c),rsiA=calcRSIArr(p,rP).filter(v=>v!==null);
@@ -239,9 +185,6 @@ function calcStochRSI(kl,rP=14,sP=14){
   return{k,d:(k+prevK)/2,bullCross:prevK<20&&k>=20,bearCross:prevK>80&&k<=80};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §12  K线形态（精确移植 FINCH §_Θ6n）
-// ════════════════════════════════════════════════════════════════
 function calcCandles(kl){
   if(!kl||kl.length<5)return{patterns:[],score:0,hasBull:false,hasBear:false};
   const patterns=[];let score=0;
@@ -259,9 +202,6 @@ function calcCandles(kl){
   return{patterns,score,hasBull:score>0,hasBear:score<0};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §13  Volume Profile + POC（精确移植 FINCH §_Ρ3v）
-// ════════════════════════════════════════════════════════════════
 function calcVolProfile(kl){
   if(!kl||kl.length<20)return{poc:0,vah:0,val:0,avg:0,lastVol:0,ratio:1};
   const recent=kl.slice(-20),avg=recent.reduce((a,k)=>a+k.v,0)/recent.length,lv=kl[kl.length-1].v;
@@ -279,9 +219,6 @@ function calcVolProfile(kl){
   return{poc,vah,val:val_p,avg,lastVol:lv,ratio:avg>0?lv/avg:1};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §14  MTF 多时框对齐（精确移植 FINCH §_Ω5m）
-// ════════════════════════════════════════════════════════════════
 function calcMTF(klMap){
   const tfs=['15m','1h','4h','1d'];let bullCount=0,bearCount=0,total=0;const details=[];
   for(const tf of tfs){
@@ -295,49 +232,38 @@ function calcMTF(klMap){
   return{alignment,score:alignment*1.8,bullCount,bearCount,total,details,fullyAligned:Math.abs(alignment)>0.9,partiallyAligned:Math.abs(alignment)>0.5};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §15  VWAP
-// ════════════════════════════════════════════════════════════════
 function calcVWAP(kl){
   if(!kl||kl.length<5)return 0;
   const day=kl.slice(-24),tpv=day.reduce((s,k)=>s+(k.h+k.l+k.c)/3*k.v,0),vol=day.reduce((s,k)=>s+k.v,0);
   return vol>0?tpv/vol:kl[kl.length-1].c;
 }
 
-// ════════════════════════════════════════════════════════════════
-// §16  置信度柱子评分 Grade A-D（精确移植 FINCH 核心）
-// ════════════════════════════════════════════════════════════════
 function calcConviction(a){
   const{isBull,rsi,macd,mktStr,adx,supertrend,vegas,obv,cvd,mtf,hv,candles,ichimoku,tr1d,tr1w,fundingMeta}=a;
   const pillars=[],weaknesses=[];
 
-  // HTF 趋势
   const htfStrong=isBull?(tr1d>0&&tr1w>0):(tr1d<0&&tr1w<0);
   const htfAgrees=isBull?(tr1d>0||tr1w>0):(tr1d<0||tr1w<0);
   if(htfStrong)pillars.push({name:'HTF双线顺势',detail:`日+周${isBull?'多头':'空头'}`,weight:20});
   else if(htfAgrees)pillars.push({name:'HTF单线顺势',detail:`大趋势${isBull?'多头':'空头'}`,weight:12});
   else weaknesses.push({name:'HTF逆势',detail:'日/周趋势相反',severity:'high'});
 
-  // 市场结构
   if(isBull&&mktStr?.hhhl)pillars.push({name:'HH/HL多头结构',detail:'高低点持续抬升',weight:15});
   else if(!isBull&&mktStr?.lllh)pillars.push({name:'LL/LH空头结构',detail:'高低点持续下移',weight:15});
   else if(isBull&&mktStr?.bullCHoCH)pillars.push({name:'CHoCH多头转换',detail:'结构从空转多',weight:10});
   else if(!isBull&&mktStr?.bearCHoCH)pillars.push({name:'CHoCH空头转换',detail:'结构从多转空',weight:10});
   else weaknesses.push({name:'结构不清晰',detail:'无明显HH/HL或LL/LH',severity:'medium'});
 
-  // MACD 背离
   if(isBull&&macd?.bullDiv)pillars.push({name:'MACD底背驰',detail:'空头力竭，反转信号',weight:18});
   else if(!isBull&&macd?.bearDiv)pillars.push({name:'MACD顶背驰',detail:'多头力竭，顶部信号',weight:18});
   else if(isBull&&macd?.hist>0)pillars.push({name:'MACD多头动能',detail:'柱状图为正',weight:8});
   else if(!isBull&&macd?.hist<0)pillars.push({name:'MACD空头动能',detail:'柱状图为负',weight:8});
   else weaknesses.push({name:'MACD逆势',detail:'动能方向相反',severity:'medium'});
 
-  // Vegas 通道
   if(isBull&&vegas?.above)pillars.push({name:'Vegas通道上方',detail:'EMA144/169共同支撑',weight:10});
   else if(!isBull&&vegas?.below)pillars.push({name:'Vegas通道下方',detail:'EMA144/169共同压制',weight:10});
   else if(vegas)weaknesses.push({name:'Vegas逆势',detail:'价格不在有利通道',severity:'low'});
 
-  // Ichimoku
   if(ichimoku){
     if(isBull&&ichimoku.fullBull)pillars.push({name:'Ichimoku全多共振',detail:'云上+TK多+Chikou多',weight:12});
     else if(!isBull&&ichimoku.fullBear)pillars.push({name:'Ichimoku全空共振',detail:'云下+TK空+Chikou空',weight:12});
@@ -345,29 +271,24 @@ function calcConviction(a){
     else if(!isBull&&ichimoku.belowCloud)pillars.push({name:'云下运行',detail:'价格低于云层',weight:6});
   }
 
-  // Supertrend
   if(isBull&&supertrend?.bull)pillars.push({name:'Supertrend多头',detail:`支撑@${supertrend.value?.toFixed?.(2)||''}`,weight:8});
   else if(!isBull&&supertrend?.bear)pillars.push({name:'Supertrend空头',detail:'下方支撑被破',weight:8});
   else weaknesses.push({name:'Supertrend逆势',detail:'趋势方向相反',severity:'low'});
 
-  // OBV + CVD
   if(isBull&&obv?.obvTrend===1)pillars.push({name:'OBV量能流入',detail:'筹码净流入',weight:8});
   else if(!isBull&&obv?.obvTrend===-1)pillars.push({name:'OBV量能流出',detail:'筹码净流出',weight:8});
   else weaknesses.push({name:'OBV量价背离',detail:'量能方向不支持',severity:'low'});
   if(isBull&&cvd?.bullishDelta)pillars.push({name:'CVD买盘主导',detail:'Taker买压大于卖压',weight:6});
   else if(!isBull&&!cvd?.bullishDelta)pillars.push({name:'CVD卖盘主导',detail:'Taker卖压大于买压',weight:6});
 
-  // RSI 区间
   if(isBull&&rsi<35)pillars.push({name:'RSI超卖区域',detail:`RSI ${rsi.toFixed(0)} < 35`,weight:10});
   else if(!isBull&&rsi>65)pillars.push({name:'RSI超买区域',detail:`RSI ${rsi.toFixed(0)} > 65`,weight:10});
   else if(isBull&&rsi>68)weaknesses.push({name:'RSI超买做多',detail:'超买区间追多风险高',severity:'medium'});
   else if(!isBull&&rsi<32)weaknesses.push({name:'RSI超卖做空',detail:'超卖区间做空风险高',severity:'medium'});
 
-  // ADX
   if(adx?.strong)pillars.push({name:'ADX强趋势',detail:`ADX ${adx.adx?.toFixed(0)||''} > 35`,weight:8});
   else if(adx?.ranging)weaknesses.push({name:'ADX震荡市',detail:'无明显趋势，慎追',severity:'low'});
 
-  // MTF
   if(mtf?.fullyAligned){
     if(isBull&&mtf.alignment>0)pillars.push({name:'MTF全框架多头共振',detail:`${mtf.bullCount}/${mtf.total}时框看多`,weight:15});
     else if(!isBull&&mtf.alignment<0)pillars.push({name:'MTF全框架空头共振',detail:`${mtf.bearCount}/${mtf.total}时框看空`,weight:15});
@@ -378,13 +299,11 @@ function calcConviction(a){
     weaknesses.push({name:'MTF信号分歧',detail:'各时框方向不一致',severity:'medium'});
   }
 
-  // K线形态
   if(candles?.patterns?.length){
     const match=candles.patterns.filter(p=>isBull?p.bull===true:p.bull===false);
     if(match.length)pillars.push({name:match.map(p=>p.n).join('·'),detail:'K线形态确认',weight:6});
   }
 
-  // 资金费率（新增）
   if(fundingMeta){
     if(isBull&&fundingMeta.extremeShort)pillars.push({name:'资金费率空头极端',detail:`空头大量支付 ${fundingMeta.rate?.toFixed(4)}%，挤仓风险`,weight:10});
     else if(!isBull&&fundingMeta.extremeLong)pillars.push({name:'资金费率多头极端',detail:`多头大量支付 ${fundingMeta.rate?.toFixed(4)}%，爆仓风险`,weight:10});
@@ -401,9 +320,6 @@ function calcConviction(a){
   return{pillars,weaknesses,convictionScore:score,grade,gradeColor,gradeLabel,totalW,weakSev};
 }
 
-// ════════════════════════════════════════════════════════════════
-// §17  主分析引擎
-// ════════════════════════════════════════════════════════════════
 function analyze(kl, sym, klMap, fundingMeta) {
   if (!kl||kl.length<30) return null;
   const kn=norm(kl);
@@ -429,7 +345,6 @@ function analyze(kl, sym, klMap, fundingMeta) {
   const ma55v    = calcMA(prices,55)[n-1];
   const ma200v   = calcMA(prices,200)[n-1];
 
-  // MTF
   let mtf = {alignment:0,score:0,fullyAligned:false,partiallyAligned:false,details:[],bullCount:0,bearCount:0,total:0};
   if (klMap) {
     const normMap={};
@@ -437,18 +352,15 @@ function analyze(kl, sym, klMap, fundingMeta) {
     mtf = calcMTF(normMap);
   }
 
-  // 日/周趋势
   let tr1d=0,tr1w=0;
   if(klMap?.['1d']){const p=norm(klMap['1d']).map(k=>k.c);const m20=calcMA(p,20)[p.length-1],m55=calcMA(p,55)[p.length-1];if(m20&&m55)tr1d=m20>m55?1:-1;}
   if(klMap?.['1w']){const p=norm(klMap['1w']).map(k=>k.c);const m10=calcMA(p,10)[p.length-1];if(m10)tr1w=p[p.length-1]>m10?1:-1;}
 
-  // 合并全局资金费率缓存
   if(!fundingMeta&&global.S?.fundingMeta&&sym){
     const key=sym.includes('USDT')?sym:sym+'USDT';
     fundingMeta=global.S.fundingMeta[key]||null;
   }
 
-  // ── 方向评分 ──
   let score=0;const sigs=[];
   if(rsi<30){score+=1.8;sigs.push({l:`RSI ${rsi.toFixed(0)} 超卖`,c:'sig-bull'});}
   else if(rsi<40){score+=0.8;sigs.push({l:`RSI ${rsi.toFixed(0)} 偏低`,c:'sig-bull'});}
@@ -512,7 +424,6 @@ function analyze(kl, sym, klMap, fundingMeta) {
 
   if(Math.abs(candles.score)>0.5){score+=candles.score*0.8;candles.patterns.forEach(p=>sigs.push({l:p.n,c:p.bull?'sig-bull':p.bull===false?'sig-bear':'sig-neut'}));}
 
-  // 资金费率（新增）
   if(fundingMeta){
     if(fundingMeta.extremeShort){score+=1.5;sigs.push({l:'资金费率空头极端',c:'sig-bull'});}
     else if(fundingMeta.extremeLong){score-=1.5;sigs.push({l:'资金费率多头极端',c:'sig-bear'});}
@@ -524,7 +435,6 @@ function analyze(kl, sym, klMap, fundingMeta) {
   else if(volProf.ratio>1.6)score*=1.06;
   else if(volProf.ratio<0.4){score*=0.88;sigs.push({l:'量能萎缩',c:'sig-neut'});}
 
-  // 信号分歧处理
   const bS=sigs.filter(s=>s.c==='sig-bull').length,rS=sigs.filter(s=>s.c==='sig-bear').length;
   const tot=bS+rS||1,conflictRatio=Math.min(bS,rS)/tot;
   const penalty=conflictRatio>0.4?1-(conflictRatio-0.4)*1.5:1.0;
@@ -532,11 +442,9 @@ function analyze(kl, sym, klMap, fundingMeta) {
   const isBull=score>=0;
   const price=prices[n-1];
 
-  // FINCH非线性置信度公式
   const absS=Math.abs(score),base=50*(1-Math.exp(-absS*0.38)),raw=Math.round(28+base);
   const conf=Math.min(90,Math.max(22,Math.round(raw*Math.max(0.6,penalty))));
 
-  // TP/SL（ATR倍数随置信度）
   const atrM=conf>=60?3.5:conf>=40?2.5:1.8;
   const tp1=isBull?price+atr*atrM:price-atr*atrM;
   const tp2=isBull?price+atr*atrM*1.8:price-atr*atrM*1.8;
@@ -545,7 +453,6 @@ function analyze(kl, sym, klMap, fundingMeta) {
 
   const conviction=calcConviction({isBull,rsi,macd,mktStr,adx,supertrend,vegas,obv,cvd,mtf,hv,candles,ichimoku,tr1d,tr1w,fundingMeta});
 
-  // 入场建议
   const vwapBull=price>vwap;
   const entryType=conf>=65?'market':conf>=45?'limit':'wait';
   const nearestSupport=mktStr.lastSwingLow||sl1,nearestResist=mktStr.lastSwingHigh||tp1;
@@ -555,20 +462,14 @@ function analyze(kl, sym, klMap, fundingMeta) {
     price,ma20v,ma55v,ma200v,atr,vwap,vwapBull,entryType,nearestSupport,nearestResist,
     rsi,macd,bb,adx,stoch,supertrend,ichimoku,vegas,obv,cvd,hv,mktStr,candles,volProf,mtf,
     tr1d,tr1w,tp1,tp2,sl1,rr:rrNum,conviction,sigs,sym,fundingMeta,
-    bS,rS // bull/bear signal counts
+    bS,rS
   };
 }
 
-// ════════════════════════════════════════════════════════════════
-// §18  格式化工具
-// ════════════════════════════════════════════════════════════════
 function fmtP(v){if(!v||isNaN(v))return'--';if(v>=10000)return'$'+Math.round(v).toLocaleString();if(v>=1)return'$'+v.toFixed(2);return'$'+v.toFixed(4);}
 function fmtPct(v,ref){if(!ref||ref<=0)return'--';const p=(v-ref)/ref*100;return(p>=0?'+':'')+p.toFixed(2)+'%';}
 function fmtPctRaw(p){return(p>=0?'+':'')+p.toFixed(2)+'%';}
 
-// ════════════════════════════════════════════════════════════════
-// §19  资金费率 + OI 获取（精确移植 FINCH）
-// ════════════════════════════════════════════════════════════════
 async function fetchFundingRate(sym) {
   try {
     const s=sym.includes('USDT')?sym:sym+'USDT';
@@ -580,7 +481,6 @@ async function fetchFundingRate(sym) {
     const fundingTrend=rates.length>=3?rates[rates.length-1]-rates[rates.length-3]:0;
     const avgRate=rates.reduce((a,b)=>a+b,0)/rates.length;
     const meta={rate,avg:avgRate,trend:fundingTrend,crowded:Math.abs(rate)>0.08,extremeLong:rate>0.1,extremeShort:rate<-0.05,rates};
-    // Cache into global S if available
     if(global.S){global.S.fundingMeta=global.S.fundingMeta||{};global.S.fundingMeta[s]=meta;}
     return meta;
   }catch(e){return null;}
@@ -598,9 +498,6 @@ async function fetchOpenInterest(sym) {
   }catch(e){return null;}
 }
 
-// ════════════════════════════════════════════════════════════════
-// §20  渲染量化面板（FINCH Verdict Card 风格）
-// ════════════════════════════════════════════════════════════════
 function renderQuantPanel(res) {
   const el=document.getElementById('mbody-quant');
   if(!el||!res)return;
@@ -617,7 +514,6 @@ function renderQuantPanel(res) {
   const cv=conviction||{grade:'C',gradeColor:'var(--amber)',gradeLabel:'--',pillars:[],weaknesses:[],convictionScore:0};
   const grd=cv.gradeColor||'var(--muted)';
 
-  // 多时框一致性阵列
   const allTFs=['15m','1h','4h','1d'];
   let tfArrHTML='';
   if(mtf.details&&mtf.details.length){
@@ -929,6 +825,8 @@ function patchXuanxue() {
       updateTopbar(result);
       updateModuleBadge(result);
       updateRightPanelModules(result);
+      // Fire event-driven callback (replaces 1200ms polling in index.html)
+      if (typeof global._onQEResult === 'function') global._onQEResult(result);
     } catch(e) { console.warn('[QuantEngine v3]', e); }
   };
 
