@@ -754,6 +754,22 @@ button,input,select{touch-action:manipulation;}
         <span class="ib-chg" id="ibSolChg"></span>
       </div>
     </div>
+    <!-- XRP价格 -->
+    <div class="ib-stat" id="ibXrpStat">
+      <div class="ib-stat-v" id="ibXrpPx">--</div>
+      <div style="display:flex;gap:4px;align-items:center;margin-top:1px">
+        <span class="ib-stat-k">XRP</span>
+        <span class="ib-chg" id="ibXrpChg"></span>
+      </div>
+    </div>
+    <!-- DOGE价格 -->
+    <div class="ib-stat" id="ibDogeStat">
+      <div class="ib-stat-v" id="ibDogePx">--</div>
+      <div style="display:flex;gap:4px;align-items:center;margin-top:1px">
+        <span class="ib-stat-k">DOGE</span>
+        <span class="ib-chg" id="ibDogeChg"></span>
+      </div>
+    </div>
     <!-- F&G -->
     <div class="ib-stat" style="min-width:72px">
       <div class="ib-stat-v" id="ibFgVal">--</div>
@@ -1641,6 +1657,8 @@ function calcPosition() {
     if(sym==='BTCUSDT'){flash('ibBtcPx',dir);var e=document.getElementById('ibBtcPx');if(e)e.textContent=fp(px);var c=document.getElementById('ibBtcChg');if(c){c.textContent=fc(chg);c.className='ib-chg '+(chg>=0?'pos':'neg');}}
     if(sym==='ETHUSDT'){flash('ibEthPx',dir);var e2=document.getElementById('ibEthPx');if(e2)e2.textContent=fp(px);var c2=document.getElementById('ibEthChg');if(c2){c2.textContent=fc(chg);c2.className='ib-chg '+(chg>=0?'pos':'neg');}}
     if(sym==='SOLUSDT'){flash('ibSolPx',dir);var e3=document.getElementById('ibSolPx');if(e3)e3.textContent=fp(px);var c3=document.getElementById('ibSolChg');if(c3){c3.textContent=fc(chg);c3.className='ib-chg '+(chg>=0?'pos':'neg');}}
+    if(sym==='XRPUSDT'){flash('ibXrpPx',dir);var e4=document.getElementById('ibXrpPx');if(e4)e4.textContent=fp(px);var c4=document.getElementById('ibXrpChg');if(c4){c4.textContent=fc(chg);c4.className='ib-chg '+(chg>=0?'pos':'neg');}}
+    if(sym==='DOGEUSDT'){flash('ibDogePx',dir);var e5=document.getElementById('ibDogePx');if(e5)e5.textContent=fp(px);var c5=document.getElementById('ibDogeChg');if(c5){c5.textContent=fc(chg);c5.className='ib-chg '+(chg>=0?'pos':'neg');}}
     // 更新 _ibGetPrice (供 xuanxue.js 调用)
     if(!window._ibPrices) window._ibPrices={};
     window._ibPrices[sym]=px;
@@ -1648,8 +1666,8 @@ function calcPosition() {
   window._ibGetPrice=function(sym){return window._ibPrices&&window._ibPrices[sym]||0;};
   function setConn(s){var d=document.getElementById('ibConnDot'),t=document.getElementById('ibConnTxt'),d2=document.getElementById('connDot'),t2=document.getElementById('connTxt');if(d)d.className='ib-conn-dot '+s;if(t)t.textContent=s==='live'?'实时':s==='rest'?'REST':'离线';if(d2)d2.className='conn-dot '+s;if(t2)t2.textContent=s==='live'?'实时':s==='rest'?'REST':'离线';}
   var ws,retries=0;
-  function connectWS(){try{ws=new WebSocket('wss://stream.binance.com:9443/stream?streams=btcusdt@miniTicker/ethusdt@miniTicker/solusdt@miniTicker/bnbusdt@miniTicker');ws.onopen=function(){retries=0;setConn('live');};ws.onmessage=function(e){try{var d=JSON.parse(e.data).data;if(!d)return;var px=parseFloat(d.c),o=parseFloat(d.o),chg=o>0?(px-o)/o*100:0;upd(d.s.toUpperCase(),px,chg);}catch(_){}};ws.onerror=function(){setConn('rest');};ws.onclose=function(){setConn('rest');retries++;setTimeout(connectWS,Math.min(30000,2000*Math.pow(1.5,retries)));}}catch(e){setConn('rest');rest();}}
-  function rest(){fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%5D').then(function(r){return r.json();}).then(function(d){d.forEach(function(t){upd(t.symbol,parseFloat(t.lastPrice),parseFloat(t.priceChangePercent));});setConn('rest');}).catch(function(){setConn('offline');});}
+  function connectWS(){try{ws=new WebSocket('wss://stream.binance.com:9443/stream?streams=btcusdt@miniTicker/ethusdt@miniTicker/solusdt@miniTicker/bnbusdt@miniTicker/xrpusdt@miniTicker/dogeusdt@miniTicker');ws.onopen=function(){retries=0;setConn('live');};ws.onmessage=function(e){try{var d=JSON.parse(e.data).data;if(!d)return;var px=parseFloat(d.c),o=parseFloat(d.o),chg=o>0?(px-o)/o*100:0;upd(d.s.toUpperCase(),px,chg);}catch(_){}};ws.onerror=function(){setConn('rest');};ws.onclose=function(){setConn('rest');retries++;setTimeout(connectWS,Math.min(30000,2000*Math.pow(1.5,retries)));}}catch(e){setConn('rest');rest();}}
+  function rest(){fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%2C%22XRPUSDT%22%2C%22DOGEUSDT%22%5D').then(function(r){return r.json();}).then(function(d){d.forEach(function(t){upd(t.symbol,parseFloat(t.lastPrice),parseFloat(t.priceChangePercent));});setConn('rest');}).catch(function(){setConn('offline');});}
   var EXTRA=['BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','SOLUSDT','SUIUSDT','DOTUSDT'];
   function fetchTicker(){fetch('https://api.binance.com/api/v3/ticker/24hr?symbols='+encodeURIComponent(JSON.stringify(EXTRA))).then(function(r){return r.json();}).then(function(d){var html='';[0,1].forEach(function(){d.forEach(function(t){var sym=t.symbol.replace('USDT',''),px=parseFloat(t.lastPrice),chg=parseFloat(t.priceChangePercent),cls=chg>=0?'pos':'neg';html+='<div class="ib-tick"><span class="ib-tick-sym">'+sym+'</span><span class="ib-tick-px '+cls+'">'+fp(px)+'</span><span class="ib-chg '+cls+'">'+(chg>=0?'▲':'▼')+Math.abs(chg).toFixed(2)+'%</span></div><span style="color:var(--line3);font-size:10px">·</span>';});});var el=document.getElementById('ibTickerInner');if(el)el.innerHTML=html;}).catch(function(){});}
   function fetchFG(){fetch('https://api.alternative.me/fng/?limit=1').then(function(r){return r.json();}).then(function(d){var v=parseInt(d.data[0].value),lb=d.data[0].value_classification;var e=document.getElementById('ibFgVal'),l=document.getElementById('ibFgLbl');if(e){e.textContent=v;e.style.color=v>=70?'var(--green)':v<=30?'var(--red)':'var(--amber)';}if(l)l.textContent=lb||'恐贪指数';}).catch(function(){});}
