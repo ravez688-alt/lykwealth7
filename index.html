@@ -3,104 +3,173 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com https://api.binance.com https://api1.binance.com https://api2.binance.com https://api3.binance.com https://api4.binance.com https://data-api.binance.vision https://stream.binance.com https://data-stream.binance.vision https://api.alternative.me https://api.coingecko.com https://api.llama.fi https://corsproxy.io https://api.allorigins.win https://thingproxy.freeboard.io https://api.anthropic.com https://www.alphavantage.co https://cdn.jsdelivr.net https://open.er-api.com https://binance-proxy.ravez0807.workers.dev wss://stream.binance.com wss://data-stream.binance.vision; connect-src 'self' https: wss: data: blob:; frame-ancestors 'none';">
+<meta http-equiv="X-Frame-Options" content="DENY">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="天機數元">
-<meta name="theme-color" content="#0a0b0f">
-<link rel="manifest" href="/manifest.json">
+<meta name="application-name" content="天機數元">
+<meta name="theme-color" content="#f5f3ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0b0f" media="(prefers-color-scheme: dark)">
+<meta name="description" content="天機數元 · 十法合一 · 玄学加密交易系统">
+<meta name="format-detection" content="telephone=no">
+
+<!-- PWA Manifest (inline, no separate file needed) -->
+<link rel="manifest" href="data:application/json,%7B%22name%22%3A%22%E5%A4%A9%E6%A9%9F%E6%95%B8%E5%85%83%22%2C%22short_name%22%3A%22%E5%A4%A9%E6%A9%9F%22%2C%22description%22%3A%22%E5%8D%81%E6%B3%95%E5%90%88%E4%B8%80%E7%8E%84%E5%AD%A6%E4%BA%A4%E6%98%93%E7%B3%BB%E7%BB%9F%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23f5f3ee%22%2C%22theme_color%22%3A%22%23f5f3ee%22%2C%22orientation%22%3A%22landscape%22%7D">
+
+<!-- iOS App Icon (inline SVG) -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23f5f3ee'/%3E%3Ctext x='90' y='118' text-anchor='middle' font-size='80' fill='%238c6410'%3E%E2%98%AF%3C/text%3E%3C/svg%3E">
+
 <title>天機數元 · 十法合一</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<script>
+(function(){
+  // Production log suppression
+  if(location.hostname!=='localhost'&&!location.search.includes('debug')){
+    var ol=console.log;
+    console.log=function(){
+      var a=arguments[0];
+      if(typeof a==='string'&&(a.startsWith('[KV]')||a.startsWith('[AutoRun]')||a.startsWith('[Mobile]')||a.startsWith('[Poller]')||a.startsWith('[Safety]')||a.startsWith('[SW]')))return;
+      ol.apply(console,arguments);
+    };
+  }
+  // Block iframe embedding
+  if(window.top!==window.self){
+    try{window.top.location.href=window.location.href;}catch(e){
+      document.body.style.cssText='display:flex;align-items:center;justify-content:center;height:100vh;background:#f5f3ee;';
+      document.body.innerHTML='<p style="font-family:serif;color:#8c6410;font-size:1.2rem">⚠ 请直接访问 天機數元</p>';
+    }
+    return;
+  }
+  // Disable right-click on canvas
+  document.addEventListener('contextmenu',function(e){if(e.target.tagName==='CANVAS')e.preventDefault();});
+  // Subtle devtools detection
+  var _dt=false;
+  setInterval(function(){
+    var w=window.outerWidth-window.innerWidth>160||window.outerHeight-window.innerHeight>160;
+    if(w&&!_dt){_dt=true;console.clear();}else if(!w){_dt=false;}
+  },2500);
+})();
+</script>
 
 <style>
 /* ═══════════════════════════════════════════════════════════
-   DESIGN SYSTEM — 天機數元
-   Aesthetic: Refined dark ink — Bloomberg terminal meets I Ching
-   Primary: Deep obsidian backgrounds, warm gold accents, crisp data
+   DESIGN SYSTEM — 天機數元 · 升级版
+   Aesthetic: Refined parchment × Bloomberg terminal × I Ching
+   Inspired by FINCH: glass morphism, real-time ticker, layered depth
 ═══════════════════════════════════════════════════════════ */
 :root {
-  /* Light theme (default) */
-  --bg:      #f5f3ee;
-  --bg2:     #ece9e2;
+  /* ── Light theme (default) ── */
+  --bg:      #F0EDE6;
+  --bg1:     #F8F5EE;
+  --bg2:     #E8E4DB;
+  --bg3:     #DDD8CE;
   --card:    #faf8f4;
   --card2:   #f0ede6;
   --panel:   #fff;
-  --border:  rgba(0,0,0,.08);
-  --border2: rgba(0,0,0,.12);
+  --border:  rgba(0,0,0,.06);
+  --border2: rgba(0,0,0,.10);
   --border3: rgba(0,0,0,.18);
   --text:    #1a1814;
+  --bright:  #140c00;
   --muted:   #5c5648;
   --faint:   #9a9080;
+  --dim:     #887860;
+
+  /* Brand gold — calibrated like FINCH */
   --gold:    #8c6410;
-  --gold2:   #b07820;
+  --gold2:   #a07820;
   --gold3:   #c89030;
   --gold-bg: rgba(140,100,16,.08);
   --gold-bd: rgba(140,100,16,.22);
-  --bull:    #16a34a;
-  --bear:    #dc2626;
-  --bull-bg: rgba(22,163,74,.08);
-  --bear-bg: rgba(220,38,38,.08);
-  --bull-bd: rgba(22,163,74,.22);
-  --bear-bd: rgba(220,38,38,.22);
-  --shadow:  0 1px 3px rgba(0,0,0,.1), 0 4px 16px rgba(0,0,0,.07);
-  --shadow2: 0 4px 24px rgba(0,0,0,.15), 0 12px 48px rgba(0,0,0,.1);
-  --glow-gold: 0 0 20px rgba(140,100,16,.12);
 
-  /* Layout & Typography */
-  /* Surfaces */
-  /* Borders */
-  /* Text */
-  /* Brand gold */
-  /* Signal colors */
-  /* Semantic */
+  /* Signals */
+  --bull:    #1a6b3a;
+  --bear:    #a01420;
+  --bull-bg: rgba(26,107,58,.08);
+  --bear-bg: rgba(160,20,32,.08);
+  --bull-bd: rgba(26,107,58,.20);
+  --bear-bd: rgba(160,20,32,.20);
+  --amber:   #805000;
+  --indigo:  #2830a0;
+  --teal:    #0a6050;
+  --purple:  #581890;
+  --sky:     #0a5870;
+
+  /* Glass morphism (key FINCH technique) */
+  --glass:         rgba(255,255,255,.55);
+  --glass-bd:      rgba(255,255,255,.8);
+  --glass-shadow:  0 8px 32px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.6);
+
+  /* Shadows — multi-layer like FINCH */
+  --shadow:        0 2px 8px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04);
+  --shadow-lg:     0 4px 16px rgba(0,0,0,.08), 0 16px 40px rgba(0,0,0,.06);
+  --shadow-inset:  inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.04);
+  --shadow2:       0 4px 24px rgba(0,0,0,.12), 0 12px 48px rgba(0,0,0,.08);
+  --glow-gold:     0 0 20px rgba(140,100,16,.14), 0 0 40px rgba(140,100,16,.06);
+
   /* Layout */
   --sidebar-w:    272px;
-  --topbar-h:     54px;
-  --r:            12px;
-  --r-sm:         8px;
-  --r-lg:         16px;
+  --topbar-h:     44px;   /* FINCH-style compact bar */
+  --infobar-h:    50px;   /* new: persistent price ticker */
+  --r:            6px;
+  --r-sm:         4px;
+  --r-lg:         10px;
+
   /* Typography */
   --font-body:    'Noto Sans SC', sans-serif;
   --font-mono:    'IBM Plex Mono', monospace;
-  --font-display: 'DM Serif Display', serif;
-  /* Shadows */
+  --font-display: 'Playfair Display', serif;
+  --font-serif:   'DM Serif Display', serif;
 }
 
 [data-theme="dark"] {
-  --bg:       #0a0b0f;
-  --bg2:      #0f1017;
-  --card:     #13151e;
-  --card2:    #181a24;
-  --panel:    #1c1f2e;
-  --border:   rgba(255,255,255,.07);
-  --border2:  rgba(255,255,255,.12);
-  --border3:  rgba(255,255,255,.18);
-  --text:     #e8e4d8;
-  --muted:    #7a7868;
-  --faint:    #44433c;
-  --gold:     #c8961e;
-  --gold2:    #e0b040;
-  --gold3:    #f0c860;
-  --gold-bg:  rgba(200,150,30,.1);
-  --gold-bd:  rgba(200,150,30,.25);
-  --bull:     #22c55e;
-  --bear:     #ef4444;
-  --bull-bg:  rgba(34,197,94,.1);
-  --bear-bg:  rgba(239,68,68,.1);
-  --bull-bd:  rgba(34,197,94,.25);
-  --bear-bd:  rgba(239,68,68,.25);
-  --amber:    #f59e0b;
-  --indigo:   #818cf8;
-  --teal:     #2dd4bf;
-  --purple:   #a78bfa;
-  --crimson:  #f43f5e;
-  --sky:      #38bdf8;
-  --emerald:  #34d399;
-  --rose:     #fb7185;
-  --shadow:   0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
-  --shadow2:  0 4px 24px rgba(0,0,0,.5), 0 12px 48px rgba(0,0,0,.4);
-  --glow-gold: 0 0 20px rgba(200,150,30,.15);
+  --bg:      #0d0e12;
+  --bg1:     #111318;
+  --bg2:     #161820;
+  --bg3:     #1c1f28;
+  --card:    #13151e;
+  --card2:   #181a24;
+  --panel:   #1c1f2e;
+  --border:  rgba(255,255,255,.06);
+  --border2: rgba(255,255,255,.10);
+  --border3: rgba(255,255,255,.18);
+  --text:    #e8e4d8;
+  --bright:  #f5f0e4;
+  --muted:   #7a7868;
+  --faint:   #44433c;
+  --dim:     #6a6858;
+
+  --gold:    #c8961e;
+  --gold2:   #e0b040;
+  --gold3:   #f0c860;
+  --gold-bg: rgba(200,150,30,.10);
+  --gold-bd: rgba(200,150,30,.25);
+
+  --bull:    #22c55e;
+  --bear:    #ef4444;
+  --bull-bg: rgba(34,197,94,.10);
+  --bear-bg: rgba(239,68,68,.10);
+  --bull-bd: rgba(34,197,94,.25);
+  --bear-bd: rgba(239,68,68,.25);
+  --amber:   #f59e0b;
+  --indigo:  #818cf8;
+  --teal:    #2dd4bf;
+  --purple:  #a78bfa;
+  --sky:     #38bdf8;
+
+  --glass:         rgba(255,255,255,.04);
+  --glass-bd:      rgba(255,255,255,.08);
+  --glass-shadow:  0 8px 32px rgba(0,0,0,.3), 0 2px 8px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.06);
+
+  --shadow:        0 1px 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+  --shadow-lg:     0 4px 16px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.4);
+  --shadow-inset:  inset 0 1px 0 rgba(255,255,255,.05), inset 0 -1px 0 rgba(0,0,0,.2);
+  --shadow2:       0 4px 24px rgba(0,0,0,.5), 0 12px 48px rgba(0,0,0,.4);
+  --glow-gold:     0 0 20px rgba(200,150,30,.18);
 }
 
 
@@ -116,11 +185,21 @@ body {
   overflow: hidden;
   letter-spacing: .01em;
   -webkit-font-smoothing: antialiased;
+  /* iOS safe area */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
+/* iOS momentum scrolling */
+.sidebar-body, .detail-body, .table-wrap { -webkit-overflow-scrolling: touch; }
+/* Prevent double-tap zoom */
+button, input, select { touch-action: manipulation; }
 
 /* ── App shell ── */
 .app {
   display: flex;
+  flex-direction: column;
   width: 100vw;
   height: 100vh;
   height: -webkit-fill-available;
@@ -128,7 +207,212 @@ body {
 }
 
 /* ══════════════════════════════════════════════
-   SIDEBAR
+   PERSISTENT INFO BAR — like FINCH's finch-bar
+   Always visible: brand + real-time BTC/ETH + FG + clock
+══════════════════════════════════════════════ */
+.info-bar {
+  display: flex;
+  align-items: center;
+  height: var(--infobar-h);
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--bg2), var(--bg3));
+  border-bottom: 2px solid var(--gold);
+  overflow: hidden;
+  z-index: 200;
+  position: relative;
+}
+
+/* Brand block */
+.ib-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  height: 100%;
+  border-right: 1px solid var(--border2);
+  flex-shrink: 0;
+  cursor: default;
+}
+.ib-brand-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  animation: ib-spin 20s linear infinite;
+}
+@keyframes ib-spin { to { transform: rotate(360deg); } }
+.ib-brand-text {
+  font-family: var(--font-display);
+  font-size: .92rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--gold);
+  line-height: 1;
+}
+.ib-brand-sub {
+  font-size: .58rem;
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* Stat blocks */
+.ib-stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 16px;
+  height: 100%;
+  border-right: 1px solid var(--border2);
+  flex-shrink: 0;
+  min-width: 100px;
+  cursor: default;
+  transition: background .15s;
+}
+.ib-stat:hover { background: rgba(0,0,0,.03); }
+.ib-stat-v {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--bright);
+  font-family: var(--font-mono);
+  letter-spacing: -.3px;
+  line-height: 1;
+}
+.ib-stat-k {
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: .8px;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+.ib-stat-chg {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.pos { color: var(--bull); }
+.neg { color: var(--bear); }
+.neu { color: var(--muted); }
+
+/* Scrolling ticker strip */
+.ib-ticker {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  position: relative;
+}
+.ib-ticker-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  white-space: nowrap;
+  animation: ticker-scroll 60s linear infinite;
+}
+.ib-ticker-inner:hover { animation-play-state: paused; }
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.ib-tick {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.ib-tick-sym {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: .5px;
+}
+.ib-tick-px {
+  font-weight: 700;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  transition: color .3s;
+}
+.ib-tick-sep {
+  color: var(--border3);
+  font-size: 10px;
+}
+
+/* Right side: connection status + clock + theme */
+.ib-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 100%;
+  border-left: 1px solid var(--border2);
+  flex-shrink: 0;
+}
+.ib-conn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  font-size: 9px;
+  color: var(--dim);
+  letter-spacing: .5px;
+}
+.ib-conn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+  flex-shrink: 0;
+}
+.ib-conn-dot.live { background: var(--bull); animation: blink 1.8s infinite; }
+.ib-conn-dot.rest { background: var(--amber); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+.ib-clock {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  letter-spacing: .3px;
+}
+
+/* Theme toggle upgraded */
+.theme-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  font-size: .75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--gold2); color: var(--gold); background: var(--gold-bg); }
+[data-theme="dark"]  .theme-toggle::after { content: '☀'; }
+[data-theme="light"] .theme-toggle::after { content: '◑'; }
+
+/* ── Inner layout (sidebar + main) ── */
+.app-inner {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+
+/* ══════════════════════════════════════════════
+   SIDEBAR — upgraded to FINCH level
 ══════════════════════════════════════════════ */
 .sidebar {
   width: var(--sidebar-w);
@@ -136,54 +420,57 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--card);
-  border-right: 1px solid var(--border);
+  background: var(--bg1);
+  border-right: 1px solid var(--border2);
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
   z-index: 10;
 }
 
-/* Gold left accent line */
+/* Gold left accent line — FINCH signature */
 .sidebar::before {
   content: '';
   position: absolute;
   top: 0; left: 0; bottom: 0;
   width: 2px;
-  background: linear-gradient(180deg, transparent, var(--gold), transparent);
-  opacity: .4;
+  background: linear-gradient(180deg, transparent 5%, var(--gold) 30%, var(--gold3) 70%, transparent 95%);
+  opacity: .5;
+  z-index: 1;
 }
 
 .sidebar-head {
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 16px 10px;
+  border-bottom: 2px solid var(--gold);
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, var(--card), var(--card2));
+  background: linear-gradient(135deg, var(--bg2), var(--bg3));
+  box-shadow: var(--shadow);
 }
 
-.brand { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
-.brand-icon { font-size: 1.5rem; flex-shrink: 0; }
+.brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+.brand-icon { font-size: 1.4rem; flex-shrink: 0; line-height: 1; }
 .brand-name {
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: 1rem;
   color: var(--gold2);
-  letter-spacing: .06em;
+  letter-spacing: .08em;
   white-space: nowrap;
+  line-height: 1;
 }
 .brand-sub {
-  font-size: .6rem;
-  color: var(--faint);
-  letter-spacing: .08em;
-  margin-top: 1px;
+  font-size: .55rem;
+  color: var(--dim);
+  letter-spacing: .06em;
+  margin-top: 3px;
 }
 
 .sidebar-body {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 16px 24px;
+  padding: 12px 14px 24px;
   overscroll-behavior: contain;
 }
 .sidebar-body::-webkit-scrollbar { width: 3px; }
@@ -191,38 +478,42 @@ body {
 .sidebar-body::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
 
 /* ── Sidebar controls ── */
-.s-section { margin-bottom: 16px; }
+.s-section { margin-bottom: 14px; }
 .s-label {
-  font-size: .65rem;
+  font-size: .6rem;
   font-weight: 700;
-  color: var(--faint);
+  color: var(--dim);
   text-transform: uppercase;
   letter-spacing: .1em;
-  margin-bottom: 7px;
+  margin-bottom: 6px;
 }
 .s-input {
   width: 100%;
   background: var(--bg2);
   border: 1px solid var(--border2);
-  border-radius: var(--r-sm);
-  padding: 8px 10px;
+  border-radius: var(--r);
+  padding: 7px 9px;
   color: var(--text);
   font-family: inherit;
-  font-size: .85rem;
+  font-size: .82rem;
   outline: none;
-  transition: border-color .15s;
+  transition: border-color .15s, box-shadow .15s;
 }
-.s-input:focus { border-color: var(--gold2); }
-.s-row { display: flex; gap: 7px; }
+.s-input:focus {
+  border-color: var(--gold2);
+  box-shadow: 0 0 0 3px var(--gold-bg);
+}
+.s-row { display: flex; gap: 6px; }
 .s-row .s-input { flex: 1; }
-.s-divider { border: none; border-top: 1px solid var(--border); margin: 13px 0; }
+.s-divider { border: none; border-top: 1px solid var(--border2); margin: 12px 0; }
 
-/* TF buttons */
+
+/* TF buttons — upgraded with glass effect */
 .tf-grid { display: flex; flex-wrap: wrap; gap: 4px; }
 .tf-btn {
-  padding: 5px 11px;
-  border-radius: 20px;
-  font-size: .72rem;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: .7rem;
   font-weight: 700;
   border: 1px solid var(--border2);
   background: var(--bg2);
@@ -230,14 +521,14 @@ body {
   cursor: pointer;
   font-family: inherit;
   letter-spacing: .02em;
-  transition: all .15s;
+  transition: all .12s;
 }
 .tf-btn:hover { border-color: var(--gold2); color: var(--gold); background: var(--gold-bg); }
 .tf-btn.active {
   background: linear-gradient(135deg, var(--gold), var(--gold3));
   border-color: var(--gold);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(140,100,16,.25);
+  box-shadow: 0 2px 8px rgba(140,100,16,.30);
 }
 
 /* System selector buttons */
@@ -261,24 +552,33 @@ body {
 }
 .sys-names { font-size: .6rem; color: var(--faint); line-height: 2; }
 
-/* Run button */
+/* Run button — FINCH-level glow */
 .run-btn {
   width: 100%;
-  padding: 12px;
+  padding: 11px;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--r);
   background: linear-gradient(135deg, var(--gold), var(--gold3));
-  color: #1a1000;
+  color: #fff;
   font-family: inherit;
-  font-size: .9rem;
+  font-size: .88rem;
   font-weight: 700;
   cursor: pointer;
-  letter-spacing: .05em;
-  transition: opacity .15s, transform .1s;
-  box-shadow: 0 4px 16px rgba(200,150,30,.35), var(--glow-gold);
+  letter-spacing: .06em;
+  transition: opacity .15s, transform .1s, box-shadow .2s;
+  box-shadow: 0 3px 12px rgba(140,100,16,.35), 0 1px 3px rgba(140,100,16,.2);
   margin-top: 4px;
+  position: relative;
+  overflow: hidden;
 }
-.run-btn:hover { opacity: .9; transform: translateY(-1px); }
+.run-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.15), transparent);
+  pointer-events: none;
+}
+.run-btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(140,100,16,.4), 0 2px 6px rgba(140,100,16,.2); }
 .run-btn:active { transform: scale(.97); }
 .run-btn.loading { opacity: .55; pointer-events: none; }
 
@@ -354,57 +654,69 @@ body {
   background: var(--bg);
 }
 
-/* ── Top bar (coin detail mode) ── */
+/* ── Top bar (coin detail mode) — FINCH-style compact ── */
 .topbar {
   height: var(--topbar-h);
   flex-shrink: 0;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--bg2), var(--bg1));
+  border-bottom: 1px solid var(--border2);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 12px;
-  box-shadow: 0 1px 0 var(--border), 0 2px 8px rgba(0,0,0,.2);
+  padding: 0 16px;
+  gap: 10px;
+  box-shadow: var(--shadow);
 }
-.topbar-sym  { font-size: 1.2rem; font-weight: 800; font-family: var(--font-mono); }
-.topbar-price { font-size: 1.05rem; font-weight: 700; font-family: var(--font-mono); }
-.topbar-chg   { font-size: .82rem; font-weight: 600; font-family: var(--font-mono); }
-.topbar-meta  { font-size: .75rem; color: var(--muted); }
-.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.topbar-sym  { font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono); }
+.topbar-price { font-size: 1rem; font-weight: 700; font-family: var(--font-mono); }
+.topbar-chg   { font-size: .78rem; font-weight: 600; font-family: var(--font-mono); }
+.topbar-meta  { font-size: .72rem; color: var(--muted); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 7px; }
 
-/* Buttons */
+/* Buttons — upgraded */
 .icon-btn {
-  background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: var(--r-sm); padding: 6px 12px;
-  font-size: .75rem; color: var(--muted);
-  cursor: pointer; font-family: inherit;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 6px 11px;
+  font-size: .72rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
   transition: all .12s;
 }
-.icon-btn:hover { border-color: var(--border3); color: var(--text); }
+.icon-btn:hover { border-color: var(--border3); color: var(--text); background: var(--bg3); }
 
 .strat-btn {
   background: var(--gold-bg);
   border: 1px solid var(--gold-bd);
   color: var(--gold2);
-  border-radius: var(--r-sm);
-  padding: 6px 13px;
-  font-size: .78rem; font-weight: 700;
-  cursor: pointer; font-family: inherit;
+  border-radius: var(--r);
+  padding: 6px 12px;
+  font-size: .76rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
   letter-spacing: .02em;
   transition: all .15s;
   white-space: nowrap;
 }
-.strat-btn:hover { background: rgba(200,150,30,.18); border-color: var(--gold2); color: var(--gold); }
+.strat-btn:hover { background: rgba(140,100,16,.15); border-color: var(--gold2); }
 
 .back-btn {
-  background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: var(--r-sm); padding: 6px 14px;
-  font-size: .8rem; color: var(--muted);
-  cursor: pointer; font-family: inherit;
-  display: flex; align-items: center; gap: 5px;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  padding: 6px 13px;
+  font-size: .78rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   transition: all .12s;
 }
-.back-btn:hover { color: var(--text); border-color: var(--border3); }
+.back-btn:hover { color: var(--text); border-color: var(--border3); background: var(--bg3); }
 
 /* ── Dashboard view ── */
 .dashboard {
@@ -441,36 +753,47 @@ body {
   color: var(--text); font-family: inherit; font-size: .75rem;
 }
 
-/* ── Stat cards ── */
+/* ── Stat cards — upgraded with glass morphism ── */
 .stat-row {
   display: grid; grid-template-columns: repeat(4,1fr);
   gap: 10px; padding: 12px 16px;
   background: var(--bg); flex-shrink: 0;
 }
 .stat-card {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--glass);
+  border: 1px solid var(--border2);
   border-radius: var(--r);
-  padding: 14px 16px;
+  padding: 13px 15px;
   cursor: pointer;
-  transition: all .15s;
+  transition: all .18s;
   position: relative; overflow: hidden;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
-.stat-card::after {
+/* Top color stripe */
+.stat-card::before {
   content: ''; position: absolute;
-  top: 0; left: 0; right: 0; height: 2px;
+  top: 0; left: 0; right: 0; height: 3px;
   border-radius: var(--r) var(--r) 0 0;
 }
-.stat-card.bull::after { background: linear-gradient(90deg, var(--bull), var(--emerald)); }
-.stat-card.bear::after { background: linear-gradient(90deg, var(--bear), var(--crimson)); }
-.stat-card.amber::after { background: linear-gradient(90deg, var(--amber), var(--gold3)); }
-.stat-card.purple::after { background: linear-gradient(90deg, var(--purple), var(--indigo)); }
-.stat-card:hover { border-color: var(--border2); transform: translateY(-1px); box-shadow: var(--shadow); }
+/* Shimmer highlight */
+.stat-card::after {
+  content: ''; position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, transparent 60%);
+  pointer-events: none;
+}
+.stat-card.bull::before  { background: linear-gradient(90deg, var(--bull), #34c97a); }
+.stat-card.bear::before  { background: linear-gradient(90deg, var(--bear), #e86060); }
+.stat-card.amber::before { background: linear-gradient(90deg, var(--amber), var(--gold3)); }
+.stat-card.purple::before{ background: linear-gradient(90deg, var(--purple), var(--indigo)); }
+.stat-card:hover { border-color: var(--border3); transform: translateY(-2px); box-shadow: var(--shadow-lg); }
 .stat-card.active { border-color: var(--gold2); box-shadow: var(--glow-gold); }
-.stat-label { font-size: .7rem; color: var(--muted); letter-spacing: .05em; margin-bottom: 5px; font-weight: 500; }
-.stat-num { font-size: 1.75rem; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
-.stat-num .unit { font-size: .85rem; font-weight: 500; margin-left: 2px; font-family: var(--font-body); }
-.stat-sub { font-size: .65rem; color: var(--faint); margin-top: 4px; }
+.stat-label { font-size: .68rem; color: var(--muted); letter-spacing: .05em; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+.stat-num { font-size: 1.8rem; font-weight: 800; font-family: var(--font-mono); line-height: 1; }
+.stat-num .unit { font-size: .78rem; font-weight: 500; margin-left: 2px; font-family: var(--font-body); }
+.stat-sub { font-size: .62rem; color: var(--faint); margin-top: 5px; }
 .stat-card.bull  .stat-num { color: var(--bull); }
 .stat-card.bear  .stat-num { color: var(--bear); }
 .stat-card.amber .stat-num { color: var(--amber); }
@@ -662,21 +985,27 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 .detail-body::-webkit-scrollbar { width: 4px; }
 .detail-body::-webkit-scrollbar-thumb { background: var(--border3); border-radius: 2px; }
 
-/* ── Analysis panels ── */
+/* ── Analysis panels — glass morphism ── */
 .panel {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--glass);
+  border: 1px solid var(--border2);
   border-radius: var(--r);
-  padding: 18px 20px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: box-shadow .2s;
 }
+.panel:hover { box-shadow: var(--shadow-lg); }
 .panel-title {
-  font-size: .92rem; font-weight: 700; color: var(--text);
-  margin-bottom: 16px;
+  font-size: .88rem; font-weight: 700; color: var(--bright);
+  margin-bottom: 14px;
   display: flex; align-items: center; gap: 8px;
-  padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--gold);
   font-family: var(--font-display);
+  letter-spacing: .03em;
 }
 
 /* Score widget */
@@ -906,22 +1235,25 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 .toast-bull { background: var(--bull); color: #fff; }
 .toast-bear { background: var(--bear); color: #fff; }
 
-/* ── Theme toggle ── */
+/* ── Theme toggle — icon button style (override old slider) ── */
 .theme-toggle {
+  width: 30px; height: 30px;
+  border-radius: 50%;
   background: var(--bg2); border: 1px solid var(--border2);
-  border-radius: 20px; width: 38px; height: 21px;
-  position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0;
+  cursor: pointer; font-size: .8rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; color: var(--muted); flex-shrink: 0;
+  position: relative;
 }
-.theme-toggle::after {
-  content: ''; position: absolute; left: 3px; top: 2.5px;
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--gold); transition: transform .2s;
-}
-[data-theme="light"] .theme-toggle::after { transform: translateX(17px); }
+.theme-toggle:hover { border-color: var(--gold2); color: var(--gold); background: var(--gold-bg); }
+[data-theme="dark"]  .theme-toggle::after { content: '☀'; }
+[data-theme="light"] .theme-toggle::after { content: '◑'; }
 
 /* ── Spinner ── */
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse-gold { 0%,100%{box-shadow:0 0 0 0 rgba(140,100,16,.4);} 50%{box-shadow:0 0 0 6px rgba(140,100,16,0);} }
+.pulse-new { animation: pulse-gold 2s ease-in-out 3; }
 .spinner {
   display: inline-block; width: 11px; height: 11px;
   border: 2px solid var(--border2); border-top-color: var(--gold);
@@ -1102,6 +1434,23 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   .sidebar-backdrop.show { display: block; }
 }
 
+/* ── Info bar responsive ── */
+@media (max-width: 767px) {
+  .info-bar { height: 38px; }
+  .ib-brand-text { font-size: .78rem; letter-spacing: 2px; }
+  .ib-brand-sub { display: none; }
+  .ib-stat { min-width: 80px; padding: 0 10px; }
+  .ib-stat:nth-child(n+4) { display: none; }
+  .ib-ticker { display: none; }
+  .ib-right { padding: 0 10px; gap: 6px; }
+  .ib-conn { display: none; }
+  /* Mobile app-inner layout */
+  .app-inner {
+    flex-direction: column !important;
+    height: auto !important;
+  }
+}
+
 /* Universal hide utility — overrides everything */
 .hidden { display: none !important; }
 
@@ -1111,17 +1460,16 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
   border-bottom: 2px solid var(--border2);
 }
 [data-theme="light"] .stat-card {
-  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,.07), inset 0 1px 0 rgba(255,255,255,.8);
 }
 [data-theme="light"] .sidebar {
-  box-shadow: 2px 0 12px rgba(0,0,0,.06);
+  box-shadow: 2px 0 16px rgba(0,0,0,.08);
 }
-[data-theme="light"] #oneClickBtn {
-  color: #fff;
+[data-theme="light"] .panel {
+  background: rgba(255,255,255,.75);
 }
-[data-theme="light"] .run-btn {
-  color: #fff;
-}
+[data-theme="light"] #oneClickBtn { color: #fff; }
+[data-theme="light"] .run-btn { color: #fff; }
 [data-theme="light"] .tc-stage.in {
   background: #e8f8ee; color: #16a34a; border-color: #a8ddb8;
 }
@@ -1262,7 +1610,71 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
 <!-- ═══════════════════════ MAIN APP ═══════════════════════ -->
 <div class="app">
 
-  <!-- ── SIDEBAR ── -->
+  <!-- ══ PERSISTENT INFO BAR — BTC/ETH/SOL prices + FG + clock ══ -->
+  <div class="info-bar" id="infoBar">
+
+    <!-- Brand -->
+    <div class="ib-brand">
+      <div class="ib-brand-icon">☯</div>
+      <div>
+        <div class="ib-brand-text">天機數元</div>
+        <div class="ib-brand-sub">十法合一</div>
+      </div>
+    </div>
+
+    <!-- BTC stat -->
+    <div class="ib-stat" id="ibBtc">
+      <div class="ib-stat-v" id="ibBtcPx">–</div>
+      <div style="display:flex;gap:5px;align-items:center;margin-top:2px">
+        <div class="ib-stat-k">BTC</div>
+        <div class="ib-stat-chg" id="ibBtcChg"></div>
+      </div>
+    </div>
+
+    <!-- ETH stat -->
+    <div class="ib-stat" id="ibEth">
+      <div class="ib-stat-v" id="ibEthPx">–</div>
+      <div style="display:flex;gap:5px;align-items:center;margin-top:2px">
+        <div class="ib-stat-k">ETH</div>
+        <div class="ib-stat-chg" id="ibEthChg"></div>
+      </div>
+    </div>
+
+    <!-- SOL stat -->
+    <div class="ib-stat" id="ibSol">
+      <div class="ib-stat-v" id="ibSolPx">–</div>
+      <div style="display:flex;gap:5px;align-items:center;margin-top:2px">
+        <div class="ib-stat-k">SOL</div>
+        <div class="ib-stat-chg" id="ibSolChg"></div>
+      </div>
+    </div>
+
+    <!-- Fear & Greed -->
+    <div class="ib-stat" id="ibFg" style="min-width:82px">
+      <div class="ib-stat-v" id="ibFgVal" style="font-size:13px">–</div>
+      <div class="ib-stat-k" id="ibFgLbl">恐贪指数</div>
+    </div>
+
+    <!-- Scrolling ticker strip (extended coins) -->
+    <div class="ib-ticker">
+      <div class="ib-ticker-inner" id="ibTickerInner">
+        <!-- JS will populate -->
+      </div>
+    </div>
+
+    <!-- Right: connection + clock + theme -->
+    <div class="ib-right">
+      <div class="ib-conn" id="ibConn">
+        <div class="ib-conn-dot" id="ibConnDot"></div>
+        <span id="ibConnTxt">连接中</span>
+      </div>
+      <div class="ib-clock" id="ibClock">--:--:--</div>
+      <button class="theme-toggle" onclick="toggleTheme()" title="切换主题"></button>
+    </div>
+  </div>
+
+  <!-- ══ INNER: sidebar + main ══ -->
+  <div class="app-inner" style="display:flex;flex:1;min-height:0;overflow:hidden">
   <aside class="sidebar">
     <div class="sidebar-head">
       <div class="brand">
@@ -1272,7 +1684,6 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
           <div class="brand-sub">十法合一 · 玄学交易系统</div>
         </div>
       </div>
-      <button class="theme-toggle" onclick="toggleTheme()"></button>
       <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileSidebar()" aria-label="菜单">☰</button>
     </div>
 
@@ -1640,6 +2051,7 @@ table.coin-tbl tbody td { padding: 10px 12px; vertical-align: middle; }
     </div>
 
   </main>
+</div><!-- /app-inner -->
 </div><!-- /app -->
 
 <script src="xuanxue.js"></script>
@@ -1777,11 +2189,263 @@ window.addEventListener('load', function() {
 
 
 <script>
+/* ══════════════════════════════════════════════════════════
+   INFO-BAR ENGINE — 实时行情 + 恐贪指数 + UTC+8时钟
+   像FINCH一样永久显示在顶栏
+   数据源: Binance REST + WebSocket + Alternative.me
+══════════════════════════════════════════════════════════ */
+(function() {
+  'use strict';
+
+  /* ── 格式化价格 ── */
+  function fmtPx(n) {
+    n = Number(n);
+    if (!n || isNaN(n)) return '–';
+    if (n >= 10000) return '$' + Math.round(n).toLocaleString();
+    if (n >= 1)     return '$' + n.toFixed(2);
+    if (n >= 0.01)  return '$' + n.toFixed(4);
+    return '$' + n.toFixed(6);
+  }
+  function fmtChg(pct) {
+    if (pct === null || pct === undefined || isNaN(pct)) return '';
+    var sign = pct >= 0 ? '+' : '';
+    return sign + pct.toFixed(2) + '%';
+  }
+
+  /* ── 闪烁动画（价格变化时） ── */
+  function flash(el, dir) {
+    if (!el) return;
+    el.style.transition = 'color .12s';
+    el.style.color = dir > 0 ? 'var(--bull)' : (dir < 0 ? 'var(--bear)' : '');
+    setTimeout(function() { el.style.color = ''; }, 800);
+  }
+
+  /* ── 实时价格存储 ── */
+  var prices = { BTCUSDT: null, ETHUSDT: null, SOLUSDT: null };
+  var chgs   = { BTCUSDT: null, ETHUSDT: null, SOLUSDT: null };
+
+  /* ── DOM helpers ── */
+  var $ = function(id) { return document.getElementById(id); };
+
+  function updateStat(sym, px, chg) {
+    var prev = prices[sym];
+    prices[sym] = px;
+    chgs[sym]   = chg;
+
+    var dir = prev ? (px > prev ? 1 : px < prev ? -1 : 0) : 0;
+
+    if (sym === 'BTCUSDT') {
+      var el = $('ibBtcPx');
+      if (el) { flash(el, dir); el.textContent = fmtPx(px); }
+      var chgEl = $('ibBtcChg');
+      if (chgEl) {
+        chgEl.textContent = fmtChg(chg);
+        chgEl.className   = 'ib-stat-chg ' + (chg >= 0 ? 'pos' : 'neg');
+      }
+    } else if (sym === 'ETHUSDT') {
+      var el2 = $('ibEthPx');
+      if (el2) { flash(el2, dir); el2.textContent = fmtPx(px); }
+      var chgEl2 = $('ibEthChg');
+      if (chgEl2) {
+        chgEl2.textContent = fmtChg(chg);
+        chgEl2.className   = 'ib-stat-chg ' + (chg >= 0 ? 'pos' : 'neg');
+      }
+    } else if (sym === 'SOLUSDT') {
+      var el3 = $('ibSolPx');
+      if (el3) { flash(el3, dir); el3.textContent = fmtPx(px); }
+      var chgEl3 = $('ibSolChg');
+      if (chgEl3) {
+        chgEl3.textContent = fmtChg(chg);
+        chgEl3.className   = 'ib-stat-chg ' + (chg >= 0 ? 'pos' : 'neg');
+      }
+    }
+  }
+
+  /* ── 1. 连接状态指示 ── */
+  var connDot = $('ibConnDot');
+  var connTxt = $('ibConnTxt');
+  function setConn(state) {
+    if (!connDot) return;
+    connDot.className = 'ib-conn-dot ' + state;
+    connTxt.textContent = state === 'live' ? '实时' : (state === 'rest' ? 'REST' : '离线');
+  }
+
+  /* ── 2. Binance WebSocket — BTC/ETH/SOL mini-ticker ── */
+  var ws = null;
+  var wsRetries = 0;
+  function connectWS() {
+    try {
+      var url = 'wss://stream.binance.com:9443/stream?streams=' +
+        'btcusdt@miniTicker/ethusdt@miniTicker/solusdt@miniTicker';
+      ws = new WebSocket(url);
+
+      ws.onopen = function() {
+        wsRetries = 0;
+        setConn('live');
+      };
+
+      ws.onmessage = function(e) {
+        try {
+          var d = JSON.parse(e.data);
+          if (!d || !d.data) return;
+          var t = d.data;
+          var sym = (t.s || '').toUpperCase();
+          var px  = parseFloat(t.c);
+          var o   = parseFloat(t.o);
+          var chg = o > 0 ? (px - o) / o * 100 : 0;
+          if (px > 0) updateStat(sym, px, chg);
+        } catch(_) {}
+      };
+
+      ws.onerror = function() { setConn('rest'); };
+      ws.onclose = function() {
+        setConn('rest');
+        wsRetries++;
+        var delay = Math.min(30000, 2000 * Math.pow(1.5, wsRetries));
+        setTimeout(connectWS, delay);
+      };
+    } catch(e) {
+      setConn('rest');
+      restFallback();
+    }
+  }
+
+  /* ── 3. REST fallback (when WS fails) ── */
+  var restTimer = null;
+  function restFallback() {
+    fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=%5B%22BTCUSDT%22%2C%22ETHUSDT%22%2C%22SOLUSDT%22%5D')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        data.forEach(function(t) {
+          var px  = parseFloat(t.lastPrice);
+          var chg = parseFloat(t.priceChangePercent);
+          if (px > 0) updateStat(t.symbol, px, chg);
+        });
+        setConn('rest');
+      })
+      .catch(function() { setConn('offline'); });
+  }
+
+  /* ── 4. 扩展 ticker 条（BNB / XRP / ADA / DOGE / AVAX / LINK / DOT） ── */
+  var TICKER_SYMS = ['BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','SUIUSDT','WIFUSDT'];
+  var tickerPrices = {};
+
+  function buildTickerHTML() {
+    var inner = $('ibTickerInner');
+    if (!inner) return;
+    var items = Object.entries(tickerPrices);
+    if (items.length === 0) return;
+    var html = '';
+    // Duplicate for seamless loop
+    [0,1].forEach(function() {
+      items.forEach(function(kv) {
+        var sym   = kv[0].replace('USDT','');
+        var data  = kv[1];
+        var cls   = data.chg >= 0 ? 'pos' : 'neg';
+        html += '<div class="ib-tick">' +
+          '<span class="ib-tick-sym">' + sym + '</span>' +
+          '<span class="ib-tick-px ' + cls + '">' + fmtPx(data.px) + '</span>' +
+          '<span class="ib-tick-sep ' + cls + '">' + (data.chg >= 0 ? '▲' : '▼') +
+            Math.abs(data.chg).toFixed(2) + '%</span>' +
+          '</div>' +
+          '<span class="ib-tick-sep" style="color:var(--border3)">·</span>';
+      });
+    });
+    inner.innerHTML = html;
+  }
+
+  function fetchTickerPrices() {
+    var symStr = encodeURIComponent(JSON.stringify(TICKER_SYMS));
+    fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=' + symStr)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        data.forEach(function(t) {
+          tickerPrices[t.symbol] = {
+            px:  parseFloat(t.lastPrice),
+            chg: parseFloat(t.priceChangePercent)
+          };
+        });
+        buildTickerHTML();
+      })
+      .catch(function() {});
+  }
+
+  /* ── 5. 恐贪指数 ── */
+  function fetchFearGreed() {
+    fetch('https://api.alternative.me/fng/?limit=1')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var val = parseInt(d.data[0].value);
+        var lbl = d.data[0].value_classification;
+        var el  = $('ibFgVal');
+        var lb  = $('ibFgLbl');
+        if (el) {
+          el.textContent = val;
+          var c = val >= 70 ? 'var(--bull)' : val <= 30 ? 'var(--bear)' : 'var(--amber)';
+          el.style.color = c;
+        }
+        if (lb) lb.textContent = lbl || '恐贪指数';
+      })
+      .catch(function() {});
+  }
+
+  /* ── 6. UTC+8 时钟 ── */
+  function updateClock() {
+    var clk = $('ibClock');
+    var utk = $('utc8ClockEl');
+    var now = new Date();
+    // UTC+8
+    var u8  = new Date(now.getTime() + 8 * 3600000);
+    var hh  = String(u8.getUTCHours()).padStart(2,'0');
+    var mm  = String(u8.getUTCMinutes()).padStart(2,'0');
+    var ss  = String(u8.getUTCSeconds()).padStart(2,'0');
+    var str = hh + ':' + mm + ':' + ss;
+    if (clk) clk.textContent = str;
+    if (utk) utk.textContent = str;
+  }
+
+  /* ── 7. 启动 ── */
+  window.addEventListener('load', function() {
+    // Slight delay so WS init doesn't block first paint
+    setTimeout(function() {
+      // Initial REST load for immediate display
+      restFallback();
+      // Try WebSocket
+      connectWS();
+      // Extended ticker (less critical)
+      setTimeout(fetchTickerPrices, 2000);
+      // Fear & Greed (refreshes every 10 min)
+      fetchFearGreed();
+      setInterval(fetchFearGreed, 10 * 60 * 1000);
+      // REST refresh every 30s (backup if WS is down)
+      setInterval(function() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) restFallback();
+      }, 30000);
+      // Ticker refresh every 2 min
+      setInterval(fetchTickerPrices, 120000);
+    }, 600);
+
+    // Clock: every second
+    updateClock();
+    setInterval(updateClock, 1000);
+  });
+
+  /* ── 8. 把主要价格暴露给 xuanxue.js，避免它重复拉取 ── */
+  window._ibGetPrice = function(sym) {
+    sym = (sym || '').toUpperCase();
+    if (!sym.endsWith('USDT')) sym += 'USDT';
+    return prices[sym] || null;
+  };
+
+})();
+</script>
+
+<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js')
-      .then(function(reg) { console.log('SW registered'); })
-      .catch(function(e) { console.log('SW failed:', e); });
+      .then(function() {})
+      .catch(function() {});
   });
 }
 </script>
