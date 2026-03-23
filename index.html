@@ -950,15 +950,11 @@ body::before {
 
     <div class="left-controls">
       <button id="oneClickBtn"
-        onclick="(window.oneClick||window._oneClickFallback||{runAll:function(){alert('系统初始化中')}}).runAll()"
+        onclick="window._safeRunAll()"
         class="run-btn">
         <span>▶</span><span>全自动推演</span>
       </button>
-      <select id="autoMode" class="mode-select">
-        <option value="quick" selected>⚡ 快速模式</option>
-        <option value="smart">🧠 智能模式（推演+学习）</option>
-        <option value="deep">🔮 深度模式（全流程）</option>
-      </select>
+      <input type="hidden" id="autoMode" value="quick">
       <div class="ar-row">
         <button class="ar-toggle" id="arToggle" onclick="toggleAutoRefresh()"><span id="arIcon">▶</span></button>
         <div class="ar-info">
@@ -1039,16 +1035,11 @@ body::before {
       <!-- 工具栏 -->
       <div id="oneClickBar" class="toolbar">
         <button id="oneClickBtnInline"
-          onclick="(window.oneClick||{runAll:function(){alert('初始化中')}}).runAll()"
+          onclick="window._safeRunAll()"
           class="toolbar-run">
           ▶ 全自动推演
         </button>
-        <select id="autoModeInline" class="mode-select" style="flex:1;max-width:120px;margin:0"
-          onchange="document.getElementById('autoMode').value=this.value">
-          <option value="quick" selected>⚡ 快速</option>
-          <option value="smart">🧠 智能</option>
-          <option value="deep">🔮 深度</option>
-        </select>
+<input type="hidden" id="autoModeInline" value="quick">
         <button onclick="runNetDiag()" class="icon-btn" title="网络诊断">🔍</button>
       </div>
 
@@ -1481,22 +1472,11 @@ body::before {
         </div>
         <div class="port-field"><div class="port-label">最大仓位 %</div><input class="port-input" id="portMaxPos" type="number" value="25" min="1" max="100" step="5"></div>
       </div>
-      <button class="port-calc-btn" onclick="calcPosition()">▶ 计算盈亏</button>
+      <button class="port-calc-btn" onclick="calcPortfolioPosition()">▶ 计算盈亏</button>
       <div class="port-result" id="portResult"></div>
     </div>
 
-    <!-- 大波段斐波 -->
-    <div class="fib-section">
-      <div class="fib-title">// 大波段斐波那契</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-        <div><div class="port-label">高点</div><input type="number" id="fibHigh" class="port-input" placeholder="如 109000" step="any" oninput="calcFib()"></div>
-        <div><div class="port-label">低点</div><input type="number" id="fibLow"  class="port-input" placeholder="如 59800" step="any" oninput="calcFib()"></div>
-      </div>
-      <select id="fibCoin" class="port-input" onchange="calcFib()" style="margin-bottom:6px">
-        <option value="BTC">BTC</option><option value="ETH">ETH</option><option value="SOL">SOL</option><option value="OTHER">其他</option>
-      </select>
-      <div id="fibResult" class="fib-result">输入高低点后自动计算</div>
-    </div>
+
 
     <!-- 月份能量 -->
     <div class="cycle-section">
@@ -1560,6 +1540,44 @@ body::before {
 <script src="xuanxue.js"></script>
 <script src="xuanxue_quant.js"></script>
 <script>
+
+// ── 安全运行入口 — 解决初始化时序问题 ──
+// xuanxue.js 在文件85%处才设置 window.oneClick
+// 用户可能在此之前点击按钮，所以用轮询重试代替 alert
+window._safeRunAll = function() {
+  var btn = document.getElementById('oneClickBtnInline') || document.getElementById('oneClickBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 初始化中...'; }
+
+  var maxWait = 8000; // 最多等8秒
+  var interval = 100;
+  var waited = 0;
+
+  function tryRun() {
+    if (window.oneClick && typeof window.oneClick.runAll === 'function') {
+      // 恢复按钮状态
+      if (btn) { btn.disabled = false; }
+      var mEl = document.getElementById('autoMode');
+      if (mEl) mEl.value = (document.getElementById('autoModeInline') || {}).value || 'quick';
+      window.oneClick.runAll();
+      return;
+    }
+    // 备用：直接点击隐藏按钮
+    var rb = document.getElementById('runAllBtn');
+    if (rb && typeof runDashboard === 'function') {
+      if (btn) { btn.disabled = false; }
+      rb.click();
+      return;
+    }
+    waited += interval;
+    if (waited >= maxWait) {
+      if (btn) { btn.disabled = false; btn.textContent = '▶ 全自动推演'; }
+      alert('系统加载超时，请刷新页面重试');
+      return;
+    }
+    setTimeout(tryRun, interval);
+  }
+  tryRun();
+};
 
 // ── 模块折叠 ──
 if (!window.toggleMod) {
@@ -1731,7 +1749,7 @@ function setLev(n, btn) {
   document.querySelectorAll('.port-lev-btn').forEach(function(b){b.classList.remove('active');});
   if (btn) btn.classList.add('active');
 }
-function calcPosition() {
+function calcPortfolioPosition() {
   var cap=parseFloat(document.getElementById('portCapital').value)||1000;
   var pct=parseFloat(document.getElementById('portPct').value);
   var tp=parseFloat(document.getElementById('portTP').value);
@@ -1971,6 +1989,13 @@ function closeMobileSidebar(){document.body.style.overflow='';}
 // 用户点击按钮才触发计算
 // ═══════════════════════════════════════════════════════
 window.addEventListener('load', function() {
+  // Pre-warm: verify oneClick is ready within 2s of load
+  // This ensures first button click is instant
+  (function preWarm() {
+    if (window.oneClick && typeof window.oneClick.runAll === 'function') return;
+    setTimeout(preWarm, 200);
+  })();
+
   // Step 1: 3s后加载资金费率（低优先级）
   setTimeout(function() {
     var sym=(window.S&&window.S.sym)||'BTCUSDT';
@@ -1983,6 +2008,13 @@ window.addEventListener('load', function() {
   setTimeout(function(){
     renderSeedList(window._ibPrices||null, null);
   }, 500);
+
+  // Step 3: 月份能量周期初始化（确保 xuanxue.js 已加载）
+  setTimeout(function(){
+    var cyEl = document.getElementById('cycleYear');
+    if (cyEl && !cyEl.value) cyEl.value = new Date().getFullYear();
+    if (typeof renderMonthCycle === 'function') renderMonthCycle();
+  }, 800);
 
   // Step 3: 不自动执行推演！等用户点击
   // （这是与原版最大的差异 — 移植自FINCH的懒启动）
