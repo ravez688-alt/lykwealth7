@@ -1,23 +1,14 @@
-// xuanxue.js — 天機數元 · 完整系统
-// 包含：玄学引擎 + UI逻辑 + 仪表盘 + 推演流程
 
-// Restore saved theme on load (default: light)
 (function(){
   try {
     var t = localStorage.getItem('xuanxue_theme') || localStorage.getItem('tianjishu-theme');
     if (t) document.documentElement.setAttribute('data-theme', t);
-    // else: HTML already has data-theme=light as default
   } catch(_) {}
 })();
 
 
 
-// ═══════════════════════════════════════════════
-// GLOBAL SAFETY: safe number helpers
-// NOTE: SES (Cloudflare) freezes Number.prototype — patch it safely
-// ═══════════════════════════════════════════════
 (function() {
-  // Try to patch Number.prototype for convenience, but don't crash if SES blocks it
   try {
     const _origToFixed = Number.prototype.toFixed;
     const _patched = function(digits) {
@@ -28,11 +19,8 @@
       value: _patched, writable: true, configurable: true
     });
   } catch(e) {
-    // SES environment — Number.prototype is frozen, that's OK
-    console.log('[Safety] Number.prototype frozen by SES, using fallback helpers');
   }
 
-  // Safe toFixed standalone function
   window._safeFixed = function(n, digits) {
     try {
       const num = Number(n);
@@ -57,17 +45,12 @@
     return '$' + window._safeFixed(n, 6);
   };
 })();
-// ══════════════════════════════════════════════════════════
-// KV 云同步模块 — 学习数据跨设备同步
-// 读写优先走 Cloudflare KV，本地 localStorage 作备份
-// ══════════════════════════════════════════════════════════
 const _KV = (() => {
   const WORKER = 'https://binance-proxy.ravez0807.workers.dev';
   const SYNC_KEYS = ['custom_engine_weights','err_price','err_time','err_weights','err_stats','simple_weights','price_errors','time_errors'];
-  let _cache = {};  // in-memory cache to avoid redundant requests
+  let _cache = {};
 
   async function get(key, fallback) {
-    // Check memory cache first
     if (_cache[key] !== undefined) return _cache[key];
     try {
       const r = await fetch(`${WORKER}/kv?key=${encodeURIComponent(key)}`);
@@ -75,15 +58,12 @@ const _KV = (() => {
         const d = await r.json();
         if (d.value !== null && d.value !== undefined) {
           _cache[key] = d.value;
-          // Also update localStorage as backup
           try { localStorage.setItem(key, d.value); } catch(_) {}
           return d.value;
         }
       }
     } catch(e) {
-      // Network failed — fall back to localStorage
     }
-    // localStorage fallback
     try {
       const local = localStorage.getItem(key);
       if (local !== null) return local;
@@ -93,19 +73,15 @@ const _KV = (() => {
 
   async function set(key, value) {
     const str = typeof value === 'string' ? value : JSON.stringify(value);
-    // Update memory cache immediately
     _cache[key] = str;
-    // Update localStorage immediately (sync)
     try { localStorage.setItem(key, str); } catch(_) {}
-    // Push to KV async (fire and forget, don't block)
     fetch(`${WORKER}/kv`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: str })
-    }).catch(() => {}); // Silently ignore network errors
+    }).catch(() => {});
   }
 
-  // On load: pull all KV data and sync to localStorage
   async function syncAll() {
     try {
       const r = await fetch(`${WORKER}/kv/all`);
@@ -117,13 +93,10 @@ const _KV = (() => {
           try { localStorage.setItem(k, v); } catch(_) {}
         }
       }
-      console.log('[KV] 云端数据同步完成');
     } catch(e) {
-      console.log('[KV] 云端同步失败，使用本地数据:', e.message);
     }
   }
 
-  // Start sync when page loads
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => setTimeout(syncAll, 2000));
   } else {
@@ -133,7 +106,6 @@ const _KV = (() => {
   return { get, set, syncAll };
 })();
 
-// Patch localStorage to intercept learning data writes
 (function() {
   const _origSetItem = localStorage.setItem.bind(localStorage);
   const SYNC_KEYS = ['custom_engine_weights','err_price','err_time','err_weights','err_stats','simple_weights','price_errors','time_errors'];
@@ -141,13 +113,10 @@ const _KV = (() => {
     localStorage.setItem = function(key, value) {
       _origSetItem(key, value);
       if (SYNC_KEYS.includes(key)) {
-        // Push to KV async
         _KV.set(key, value);
       }
     };
   } catch(e) {
-    // SES might block this — that's OK, direct _KV.set calls will still work
-    console.log('[KV] localStorage patch skipped (SES)');
   }
 })();
 
@@ -159,12 +128,9 @@ const _KV = (() => {
 
 
 
-// ═══════════════════════════════════════════════
-// BG CANVAS
-// ═══════════════════════════════════════════════
 (function() {
   const c = document.getElementById('bgCanvas');
-  if (!c) return; // bgCanvas not present in this UI
+  if (!c) return;
   const ctx = c.getContext('2d');
   let W, H, stars = [], lines = [];
 
@@ -183,20 +149,17 @@ const _KV = (() => {
     ctx.fillStyle = '#02020e';
     ctx.fillRect(0,0,W,H);
 
-    // gradient
     const g = ctx.createRadialGradient(W*.3,H*.4,0,W*.3,H*.4,W*.7);
     g.addColorStop(0,'rgba(10,6,30,0.9)');
     g.addColorStop(1,'rgba(2,2,14,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0,0,W,H);
 
-    // grid
     ctx.strokeStyle = 'rgba(200,168,74,0.03)';
     ctx.lineWidth = 1;
     for(let x=0;x<W;x+=64) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
     for(let y=0;y<H;y+=64) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
 
-    // stars
     stars.forEach(s => {
       s.a = Math.max(0.05, Math.min(1, s.a + s.da));
       if(s.a<=0.05||s.a>=1) s.da *= -1;
@@ -209,13 +172,33 @@ const _KV = (() => {
     requestAnimationFrame(draw);
   }
 
-  window.addEventListener('resize', resize);
+  var _canvasResizeT = null;
+  window.addEventListener('resize', function() {
+    clearTimeout(_canvasResizeT);
+    _canvasResizeT = setTimeout(resize, 200);
+  }, {passive: true});
   resize(); draw();
 })();
 
-// ═══════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════
+
+// ── localStorage memory cache (prevents repeated disk reads) ──────────────
+var _LSC = {};
+var _localStorage = {
+  getItem: function(k) {
+    if (k in _LSC) return _LSC[k];
+    try { _LSC[k] = localStorage.getItem(k); } catch(e) { _LSC[k] = null; }
+    return _LSC[k];
+  },
+  setItem: function(k, v) {
+    _LSC[k] = String(v);
+    try { localStorage.setItem(k, v); } catch(e) {}
+  },
+  removeItem: function(k) {
+    delete _LSC[k];
+    try { localStorage.removeItem(k); } catch(e) {}
+  }
+};
+
 function rng(seed) {
   let s = (seed ^ 0xdeadbeef) >>> 0;
   return () => {
@@ -241,9 +224,6 @@ function fmt(d) {
   return d.toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'});
 }
 
-// ═══════════════════════════════════════════════
-// DATA CONSTANTS
-// ═══════════════════════════════════════════════
 const HEXAGRAMS = [
   ['䷀','乾','刚健自强'],['䷁','坤','厚德载物'],['䷂','屯','艰难起步'],['䷃','蒙','启蒙开智'],
   ['䷄','需','等待时机'],['䷅','讼','争讼慎行'],['䷆','师','军旅整顿'],['䷇','比','亲附归依'],
@@ -274,9 +254,6 @@ const BRANCHES=['子','丑','寅','卯','辰','巳','午','未','申','酉','戌
 const GANN_ANG = [30,45,60,90,120,135,144,180,216,225,240,270,315,360];
 const GANN_CYCLES = [90,144,180,270,360,540,720];
 
-// ═══════════════════════════════════════════════
-// BIRTH CHART DATABASE (出生命盘)
-// ═══════════════════════════════════════════════
 const NATAL_CHARTS = {
   BTC: {
     name: '比特币', en: 'Bitcoin',
@@ -304,7 +281,7 @@ const NATAL_CHARTS = {
     halving_dates: ['2012-11-28','2016-07-09','2020-05-11','2024-04-20'],
     key_aspects: '火星-冥王星合相摩羯(革命力量) · 土星-天王星对分(传统vs革新) · 木星29°(扩张极限点)',
     char_energy: '摩羯阳刚、长线积累、颠覆权威',
-    gann_sq: 3 // sqrt(9) = 3, 2009年
+    gann_sq: 3
   },
   ETH: {
     name: '以太坊', en: 'Ethereum',
@@ -549,7 +526,6 @@ const NATAL_CHARTS = {
     char_energy: '平行链、跨链通信、Web3基础设施',
     gann_sq: Math.round(Math.sqrt(2020))
   },
-  // ── COMMODITIES ──
   GOLD: {
     name: '黄金', en: 'Gold (COMEX)',
     date: '1974-12-31', time: '09:30:00', tz: 'EST',
@@ -577,7 +553,7 @@ const NATAL_CHARTS = {
     char_energy: '通胀对冲、避险天堂、摩羯保守增值',
     gann_sq: Math.round(Math.sqrt(1974)),
     commodity: true,
-    gann_price_sq: 35 // 1974年黄金约$175，约sqrt=13，方格约169
+    gann_price_sq: 35
   },
   SILVER: {
     name: '白银', en: 'Silver (COMEX)',
@@ -721,9 +697,7 @@ const NATAL_CHARTS = {
   }
 };
 
-// ── NATAL RESONANCE ENGINE (命盘共振分析) ──
 function engineNatal(coin, date) {
-  // 优先用 dashCoins 里配置的 natalKey（如 XAU→GOLD, XAG→SILVER）
   const coinConf  = (window.dashCoins || []).find(c => c.coin === coin);
   const lookupKey = coinConf?.natalKey || coin;
   const nc = NATAL_CHARTS[lookupKey];
@@ -732,29 +706,23 @@ function engineNatal(coin, date) {
   const targetDate = new Date(date);
   const birthDate  = new Date(nc.date);
 
-  // Age of asset in years
   const ageYears = (targetDate - birthDate) / (365.25 * 24 * 3600 * 1000);
   const ageDays  = (targetDate - birthDate) / (24 * 3600 * 1000);
 
-  // Jupiter return (every ~11.86 years)
   const jupCycle  = 11.86;
   const jupPhase  = (ageYears % jupCycle) / jupCycle;
   const jupReturn = Math.abs(jupPhase - Math.round(jupPhase)) < 0.08;
 
-  // Saturn return (every ~29.5 years)
   const satCycle  = 29.5;
   const satPhase  = (ageYears % satCycle) / satCycle;
   const satReturn = Math.abs(satPhase - Math.round(satPhase)) < 0.06;
 
-  // Saturn square (every ~7.375 years)
   const satSqPhase = (ageYears % (satCycle/4)) / (satCycle/4);
   const satSquare  = Math.abs(satSqPhase - Math.round(satSqPhase)) < 0.1;
 
-  // Progressed Sun (1 day = 1 year in secondary progressions)
-  const progSunDeg = (ageYears * 1) % 360; // ~1 deg/yr
+  const progSunDeg = (ageYears * 1) % 360;
   const progSunSign = ['白羊','金牛','双子','巨蟹','狮子','处女','天秤','天蝎','射手','摩羯','水瓶','双鱼'][Math.floor(progSunDeg/30)];
 
-  // Halving cycle for BTC (if applicable)
   let halvingEffect = '';
   if(nc.halving_dates) {
     nc.halving_dates.forEach(hd => {
@@ -764,16 +732,13 @@ function engineNatal(coin, date) {
     });
   }
 
-  // Solar arc (same as progressed sun speed)
   const solarArcDeg = ageYears % 360;
 
-  // Seed number (Gann square of birth year)
   const birthYear = birthDate.getFullYear();
   const gannSeedSq = Math.sqrt(birthYear);
   const currentSq  = Math.sqrt(targetDate.getFullYear());
   const gannYearArc = (currentSq - gannSeedSq) * (currentSq - gannSeedSq);
 
-  // Resonance strength
   const r = rng(seed(date,coin,8888));
   let resonance = 0.4 + r()*0.3;
   if(jupReturn) resonance += 0.2;
@@ -782,7 +747,6 @@ function engineNatal(coin, date) {
   if(halvingEffect) resonance += 0.15;
   resonance = Math.min(1, resonance);
 
-  // Bias from natal planets
   const bullNatal = ['木星','金星','太阳','月亮'];
   const bearNatal = ['土星','火星','冥王星','罗睺'];
   let bias = r()*0.4 - 0.2;
@@ -804,7 +768,6 @@ function engineNatal(coin, date) {
   };
 }
 
-// Harmonic patterns
 const HARMONICS = [
   { name:'蝙蝠', en:'Bat', xab:.382, abc:.382, bcd:1.618, xad:.886 },
   { name:'螃蟹', en:'Crab', xab:.382, abc:.618, bcd:3.618, xad:1.618 },
@@ -816,18 +779,9 @@ const HARMONICS = [
   { name:'三驱', en:'3Drives', xab:1.272, abc:.618, bcd:1.272, xad:1.618 },
 ];
 
-// Fibonacci ratios
 const FIBS = [0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.414, 1.618, 2.0, 2.618];
 
-// ═══════════════════════════════════════════════
-// ENGINES
-// ═══════════════════════════════════════════════
 
-// ══════════════════════════════════════════════════════════════════
-// 奇门遁甲引擎 — 真实局数推算（无随机数）
-// 算法：① 节气定阴阳遁 ② 旬首定局数 ③ 时辰定值符宫
-//       ④ 九星/八门/八神顺逆布宫 ⑤ 门神星属性定吉凶偏向
-// ══════════════════════════════════════════════════════════════════
 function engineQiMen(coin, date) {
   const d = new Date(date);
   const yr = d.getFullYear();
@@ -835,7 +789,6 @@ function engineQiMen(coin, date) {
   const dy = d.getDate();
   const hr = d.getHours() || 12;
 
-  // 24节气近似日期 [月, 日]
   const JIEQI_DATES = [
     [1,6],[1,20],[2,4],[2,19],[3,6],[3,21],
     [4,5],[4,20],[5,6],[5,21],[6,6],[6,21],
@@ -849,29 +802,23 @@ function engineQiMen(coin, date) {
     '寒露','霜降','立冬','小雪','大雪','冬至'
   ];
 
-  // 找当前所属节气序号
   let jqIdx = 0;
   for (let i = 0; i < 24; i++) {
     const [jqMo, jqDy] = JIEQI_DATES[i];
     if (mo > jqMo || (mo === jqMo && dy >= jqDy)) jqIdx = i;
   }
 
-  // 阳遁（冬至→夏至）/ 阴遁（夏至→冬至）
   const isYang = (jqIdx >= 23 || jqIdx < 11);
 
-  // 局数1-9：每节气管3局，旬（上/中/下）决定偏移
   const dayOffset = Math.floor((dy - 1) / 10) % 3;
   const juNum = ((jqIdx % 3) * 3 + dayOffset) % 9 + 1;
 
-  // 时辰序号（子=0…亥=11）
   const shiIdx = Math.floor(((hr + 1) % 24) / 2);
 
-  // 值符宫（阳遁顺转，阴遁逆转）
   const zhiFuGong = isYang
     ? ((juNum - 1 + shiIdx) % 9) + 1
     : ((9 - (juNum - 1 + shiIdx) % 9) % 9) + 1;
 
-  // 八门/九星/八神入宫（去掉5中宫）
   const XING_ORDER = ['天蓬','天芮','天冲','天辅','天禽','天心','天柱','天任','天英'];
   const DOOR_ORDER = ['休门','生门','伤门','杜门','景门','死门','惊门','开门'];
   const GOD_ORDER  = ['值符','腾蛇','太阴','六合','白虎','玄武','九地','九天'];
@@ -900,14 +847,12 @@ function engineQiMen(coin, date) {
   const door   = doorInGong[palace] || DOORS[0];
   const god    = godInGong[palace]  || GODS[0];
 
-  // 年干支
   const stemIdx   = ((yr - 4) % 10 + 10) % 10;
   const branchIdx = ((yr - 4) % 12 + 12) % 12;
   const stem      = STEMS[stemIdx];
   const branch    = BRANCHES[branchIdx];
   const bagua     = BAGUA[zhiFuGong % 8];
 
-  // 吉凶判断（门→神→星叠加，阳/阴遁微调）
   const BULL_DOORS = ['开门','生门','休门'];
   const BEAR_DOORS = ['死门','惊门','伤门'];
   const BULL_GODS  = ['九天','六合','太阴'];
@@ -930,10 +875,8 @@ function engineQiMen(coin, date) {
   const FORMAT_LIST = ['超神','迫元','转蓬','五不遇'];
   const format      = FORMAT_LIST[jqIdx % 4];
 
-  // ── 奇门专属：进出时机（职责：时间窗口，不预测价格）────────────────────
   const SHICHEN      = ['子时','丑时','寅时','卯时','辰时','巳时','午时','未时','申时','酉时','戌时','亥时'];
-  const SHICHEN_UTC8 = ['07:00','09:00','11:00','13:00','15:00','17:00','19:00','21:00','23:00','01:00','03:00','05:00']; // UTC+8
-  // 吉门→对应入市时辰索引；凶门→对应出市时辰索引
+  const SHICHEN_UTC8 = ['07:00','09:00','11:00','13:00','15:00','17:00','19:00','21:00','23:00','01:00','03:00','05:00'];
   const ENTRY_MAP = { '开门':8,'生门':2,'休门':0,'景门':6 };
   const EXIT_MAP  = { '死门':6,'惊门':9,'伤门':3,'杜门':4 };
   const entryShiIdx = (ENTRY_MAP[door] !== undefined) ? ENTRY_MAP[door] : (zhiFuGong + 2) % 12;
@@ -942,38 +885,28 @@ function engineQiMen(coin, date) {
   const badTimes    = [SHICHEN[exitShiIdx]];
   const entryTime   = SHICHEN[entryShiIdx]  + '（≈' + SHICHEN_UTC8[entryShiIdx]  + ' UTC+8）';
   const exitTime    = SHICHEN[exitShiIdx]   + '（≈' + SHICHEN_UTC8[exitShiIdx]   + ' UTC+8）';
-  // 奇门方向：多/空/观望（供时间轴显示，不参与价格综合计算）
   const direction   = bias > 0.3 ? '多' : bias < -0.3 ? '空' : '观望';
 
   return {
-    // 兼容字段（旧UI继续正常工作）
     palace, star, door, god, stem, branch, bagua, bias, conf, format,
     isYang, juNum, jieqi: JIEQI_NAMES[jqIdx], zhiFuGong,
-    // 奇门专属：时间窗口字段
-    entryTime,    // 吉门入市时辰
-    exitTime,     // 凶门出市时辰
-    goodTimes,    // 今日吉时列表
-    badTimes,     // 今日凶时列表
-    direction,    // 综合方向：多/空/观望
+    entryTime,
+    exitTime,
+    goodTimes,
+    badTimes,
+    direction,
     confidence: conf,
   };
 }
 
-// ══════════════════════════════════════════════════════════════════
-// 易经引擎 — 数字卦法（年月日时起卦，无随机数）
-// 算法：① (年+月+日) mod 8 → 上卦  ② (年+月+日+时) mod 8 → 下卦
-//       ③ 查六十四卦表 ④ (年+月+日+时) mod 6 + 1 → 动爻
-//       ⑤ 动爻取反 → 变卦  ⑥ 卦象吉凶 + 月份 → 偏向
-// ══════════════════════════════════════════════════════════════════
 function engineIChing(coin, date) {
   const d   = new Date(date);
   const yr  = d.getFullYear();
   const mo  = d.getMonth() + 1;
   const dy  = d.getDate();
   const hr  = d.getHours() || 12;
-  const shi = Math.floor(((hr + 1) % 24) / 2); // 时辰 0-11
+  const shi = Math.floor(((hr + 1) % 24) / 2);
 
-  // 上卦、下卦（先天八卦序：乾兑离震巽坎艮坤 → 0-7）
   const upperIdx = ((yr + mo + dy) % 8 + 8) % 8;
   const lowerIdx = ((yr + mo + dy + shi) % 8 + 8) % 8;
   const XIAN_BAGUA = ['☰乾','☱兑','☲离','☳震','☴巽','☵坎','☶艮','☷坤'];
@@ -981,7 +914,6 @@ function engineIChing(coin, date) {
   const upper = XIAN_BAGUA[upperIdx];
   const lower = XIAN_BAGUA[lowerIdx];
 
-  // 六十四卦索引表（行=下卦，列=上卦，先天序）
   const HEXAGRAM_TABLE = [
     [  0,43,14,34, 9, 5,26,11],
     [ 10,58,38,54,61,41,19,19],
@@ -995,14 +927,11 @@ function engineIChing(coin, date) {
   const hexIdx = Math.min(63, HEXAGRAM_TABLE[lowerIdx][upperIdx]);
   const hex    = HEXAGRAMS[hexIdx];
 
-  // 动爻 1-6
   const line = ((yr + mo + dy + shi) % 6) + 1;
 
-  // 变卦（动爻位取反）
   const rhexIdx = Math.min(63, hexIdx ^ (1 << (line - 1)));
   const rhex    = HEXAGRAMS[rhexIdx];
 
-  // 吉凶卦集合
   const BULL_HEX = new Set([0,13,10,12,33,34,15,41,45,48,14,17,16]);
   const BEAR_HEX = new Set([1,11,38,46,29,44,22,35,55,47,39,23,63]);
 
@@ -1012,11 +941,9 @@ function engineIChing(coin, date) {
   if (BULL_HEX.has(rhexIdx)) bias += 0.20;
   if (BEAR_HEX.has(rhexIdx)) bias -= 0.20;
 
-  // 动爻位置修正
-  if (line === 1 || line === 6) bias *= 1.25;  // 初上爻：变化剧烈
-  if (line === 2 || line === 5) bias *= 0.80;  // 二五中正：趋于平和
+  if (line === 1 || line === 6) bias *= 1.25;
+  if (line === 2 || line === 5) bias *= 0.80;
 
-  // 月份消息卦修正（农历近似）
   const MONTH_BIAS = [0.2,0.1,0.15,0.2,0.1,0.3,-0.1,-0.15,-0.2,-0.1,-0.2,-0.3];
   bias += (MONTH_BIAS[mo - 1] || 0) * 0.3;
   bias = Math.max(-1, Math.min(1, bias));
@@ -1025,33 +952,23 @@ function engineIChing(coin, date) {
   const conf      = strongHex ? 0.65 + Math.min(0.25, Math.abs(bias) * 0.35) : 0.45;
   const judgment  = bias > 0.35 ? '大吉' : bias > 0.1 ? '小吉' : bias < -0.35 ? '大凶' : bias < -0.1 ? '小凶' : '平';
 
-  // ── 易经专属：趋势周期（职责：周期判断，不预测价格）──────────────────
-  // 趋势方向：由卦象阴阳属性决定
   const trend = bias > 0.2 ? '上升' : bias < -0.2 ? '下跌' : '震荡';
-  // 变化在第几天：动爻位置 × 月份系数（阴阳爻理论：初爻当日，上爻一月）
   const CHANGE_DAYS = [1, 3, 7, 14, 21, 30];
   const changeDay  = CHANGE_DAYS[line - 1] || line;
-  // 卦象描述
   const hexName    = hex[1] + '卦';
   const changeHex  = rhex[1] + '卦';
 
   return {
-    // 兼容字段（旧UI继续正常工作）
     hex, line, rhex, upper, lower, bias, conf, judgment,
     hexIdx, rhexIdx, upperName: XIAN_TIAN[upperIdx], lowerName: XIAN_TIAN[lowerIdx],
-    // 易经专属：趋势周期字段
-    trend,        // 卦象趋势：上升/下跌/震荡
-    changeDay,    // 动爻预示变化在第几天后出现
-    hexagram: hexName,     // 本卦名称
-    changingHex: changeHex, // 变卦名称
+    trend,
+    changeDay,
+    hexagram: hexName,
+    changingHex: changeHex,
     confidence: conf,
   };
 }
 
-// ══════════════════════════════════════════════════════════════════
-// 印度占星引擎 — 行星周期（职责：大周期判断，不预测价格）
-// 已保留原始逻辑；新增专属字段：cycle / energy / planet
-// ══════════════════════════════════════════════════════════════════
 function engineVedic(coin, date) {
   const r = rng(seed(date,coin,3003));
   const asc   = NAKS[Math.floor(r()*27)];
@@ -1072,17 +989,12 @@ function engineVedic(coin, date) {
   bias = Math.max(-1,Math.min(1,bias));
   const conf = 0.44+r()*0.42;
 
-  // ── 印度占星专属：大周期字段（职责：宏观周期，不预测具体价格）──────
-  // 周期判断：由大运（dasha）主导行星决定
   const EXPAND_PLANETS = ['木星','金星','太阳','月亮'];
   const CONTRACT_PLANETS = ['土星','罗睺','计都','火星'];
   const cycle = EXPAND_PLANETS.includes(dasha) ? '扩张' :
                 CONTRACT_PLANETS.includes(dasha) ? '收缩' : '过渡';
-  // 能量值 0-100（由偏向映射）
   const energy = Math.round((bias + 1) / 2 * 100);
-  // 主导行星（大运星）
   const planet = dasha;
-  // 周期说明
   const cycleNote = cycle === '扩张'
     ? `${dasha}大运·扩张期，趋势性行情偏多，可顺势持有`
     : cycle === '收缩'
@@ -1090,34 +1002,24 @@ function engineVedic(coin, date) {
     : `${dasha}大运·过渡期，方向尚不明朗，轻仓观望`;
 
   return {
-    // 兼容字段（旧UI继续正常工作）
     asc, moon, lord, trans, dasha, antar, yoga, rasi, bias, conf,
-    // 印度占星专属：大周期字段
-    cycle,      // 周期类型：扩张/收缩/过渡
-    energy,     // 能量值 0-100
-    planet,     // 主导行星（大运）
-    cycleNote,  // 周期说明文字
+    cycle,
+    energy,
+    planet,
+    cycleNote,
     confidence: conf,
   };
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// 江恩引擎 v2 ── Square of Nine + Angles + Price Multiples
-// ════════════════════════════════════════════════════════════════════════
 
-// ── 1. 江恩九方格 (Square of Nine) ──────────────────────────────────────
-// 数字在螺旋方格中的角度：angle = sqrt(n) * 180 (deg), mod 360
-// 给定价格 P，找同一角度线上（相差 360° 整数倍）的其他价格
 function gannSquareOfNine(price, extendLevels = 8) {
   const sqP   = Math.sqrt(price);
-  const angle = (sqP % 2) * 180;               // 0–360° position on the spiral
+  const angle = (sqP % 2) * 180;
 
   const levels = [];
-  // Walk outward: same angle = sqP ± n*2 → price = (sqP ± n*2)²
-  // n*2 because one full revolution of the square = increment of 2 in sqrt space
   for (let n = -extendLevels; n <= extendLevels; n++) {
     if (n === 0) continue;
-    const gannStep = parseFloat(localStorage.getItem('gann_step') || '2');
+    const gannStep = parseFloat(_localStorage.getItem('gann_step') || '2');
     const sqLvl = sqP + n * gannStep;
     if (sqLvl <= 0) continue;
     const lvlPrice = Math.pow(sqLvl, 2);
@@ -1132,8 +1034,6 @@ function gannSquareOfNine(price, extendLevels = 8) {
     });
   }
 
-  // Cardinal angles (0°/90°/180°/270°) on adjacent rings — extra confluence
-  // These are the "cross" prices on the Square of Nine
   const cardinalAngles = [0, 90, 180, 270];
   const cardinalLevels = [];
   for (let ring = 1; ring <= 6; ring++) {
@@ -1157,11 +1057,6 @@ function gannSquareOfNine(price, extendLevels = 8) {
   return { sqP: sqP.toFixed(4), angle: angle.toFixed(1), levels, cardinalLevels };
 }
 
-// ── 2. 江恩角度线 (Gann Angles) ─────────────────────────────────────────
-// 以底部价格 base 为原点，计算 t 天后各角度线的动态价位
-// 角度比率（price units per time unit）：
-//   1×8 = 82.5°, 1×4 = 75°, 1×3 ≈ 71.6°, 1×2 = 63.4°, 1×1 = 45°,
-//   2×1 = 26.6°, 3×1 ≈ 18.4°, 4×1 = 14.0°, 8×1 = 7.1°
 const GANN_ANGLE_RATIOS = [
   { label: '8×1', ratio: 8,    deg: 82.5 },
   { label: '4×1', ratio: 4,    deg: 75.0 },
@@ -1175,8 +1070,6 @@ const GANN_ANGLE_RATIOS = [
 ];
 
 function gannAngles(basePrice, targetPrice, daysFromBase) {
-  // "Scale factor" for the 1×1 line: sqrt(basePrice) gives natural price unit
-  // so Δprice per day = ratio * scale
   const scale = Math.sqrt(basePrice);
 
   return GANN_ANGLE_RATIOS.map(a => {
@@ -1184,7 +1077,7 @@ function gannAngles(basePrice, targetPrice, daysFromBase) {
     const pct      = ((priceAtT - targetPrice) / targetPrice * 100).toFixed(2);
     const isAbove  = priceAtT > targetPrice;
     const dist     = Math.abs(priceAtT - targetPrice);
-    const proximity= (1 - Math.min(1, dist / targetPrice)).toFixed(3); // closeness 0–1
+    const proximity= (1 - Math.min(1, dist / targetPrice)).toFixed(3);
     return {
       label:    a.label,
       deg:      a.deg,
@@ -1197,9 +1090,6 @@ function gannAngles(basePrice, targetPrice, daysFromBase) {
   }).filter(a => a.price > 0);
 }
 
-// ── 3. 江恩价格倍数目标 (Price Multiples) ───────────────────────────────
-// 用前高前低乘以江恩比率推算目标价
-// 江恩比率：1/8, 1/4, 3/8, 1/2, 5/8, 2/3, 3/4, 1, 4/3, 3/2, 2, 3, 4, 8
 const GANN_MULT = [
   { label: '×1/8',  mult: 0.125 },
   { label: '×1/4',  mult: 0.25  },
@@ -1220,7 +1110,6 @@ const GANN_MULT = [
 function gannPriceMultiples(high, low, currentPrice) {
   const targets = [];
   GANN_MULT.forEach(m => {
-    // From high
     const fromH = high * m.mult;
     if (fromH > 0) targets.push({
       price:   Math.round(fromH * 100) / 100,
@@ -1229,7 +1118,6 @@ function gannPriceMultiples(high, low, currentPrice) {
       isAbove: fromH > currentPrice,
       pct:     parseFloat(((fromH - currentPrice) / (currentPrice||1) * 100).toFixed(2)),
     });
-    // From low
     const fromL = low * m.mult;
     if (fromL > 0 && Math.abs(fromL - fromH) / currentPrice > 0.005) targets.push({
       price:   Math.round(fromL * 100) / 100,
@@ -1242,15 +1130,7 @@ function gannPriceMultiples(high, low, currentPrice) {
   return targets.filter(t => t.price > 0);
 }
 
-// ── Full Gann Engine (replaces old engineGann) ───────────────────────────
-// ════════════════════════════════════════════════════════════════════════
-// 市场状态分类器
-// 根据K线历史数据计算ADX/ATR/均线排列，返回当前市场状态
-// 状态: trending_up | trending_down | ranging | high_volatility
-// ════════════════════════════════════════════════════════════════════════
 function classifyMarketState(klines) {
-  // klines: Binance K线数组 [[open_time, open, high, low, close, volume, ...], ...]
-  // 至少需要20根K线
   if (!klines || klines.length < 20) {
     return { state: 'ranging', label: '震荡市', atr: 0, adx: 0, trend: 0 };
   }
@@ -1260,7 +1140,6 @@ function classifyMarketState(klines) {
   const lows   = klines.map(k => parseFloat(k[3]));
   const n      = closes.length;
 
-  // ── 1. ATR（Average True Range）波动率 ──────────────────────────────
   const trList = [];
   for (let i = 1; i < n; i++) {
     const tr = Math.max(
@@ -1275,9 +1154,8 @@ function classifyMarketState(klines) {
   for (let i = atrPeriod; i < trList.length; i++) {
     atr = (atr * (atrPeriod - 1) + trList[i]) / atrPeriod;
   }
-  const atrPct = atr / closes[n-1] * 100;  // ATR 占价格百分比
+  const atrPct = atr / closes[n-1] * 100;
 
-  // ── 2. ADX（趋势强度）简化计算 ───────────────────────────────────────
   const dmPlusList  = [], dmMinusList = [];
   for (let i = 1; i < n; i++) {
     const upMove   = highs[i]  - highs[i-1];
@@ -1285,7 +1163,6 @@ function classifyMarketState(klines) {
     dmPlusList.push( upMove   > downMove && upMove   > 0 ? upMove   : 0);
     dmMinusList.push(downMove > upMove   && downMove > 0 ? downMove : 0);
   }
-  // Smooth DM+, DM-, ATR over 14 periods
   const smooth = (arr, p) => {
     let s = arr.slice(0,p).reduce((a,b)=>a+b,0);
     const res = [s];
@@ -1300,7 +1177,6 @@ function classifyMarketState(klines) {
   const DX    = DIp.map((v,i)   => (Math.abs(v - DIm[i]) / (v + DIm[i] + 0.001)) * 100);
   const adx   = DX.slice(-atrPeriod).reduce((s,v)=>s+v,0) / atrPeriod;
 
-  // ── 3. 均线排列（5/20/60 EMA）─────────────────────────────────────────
   const ema = (arr, p) => {
     const k = 2 / (p + 1);
     let e = arr[0];
@@ -1312,29 +1188,21 @@ function classifyMarketState(klines) {
   const e5    = ema5[n-1], e20 = ema20[n-1], e60 = ema60[n-1];
   const price = closes[n-1];
 
-  // 多头排列: 价格 > EMA5 > EMA20 > EMA60
   const bullAlign = price > e5 && e5 > e20 && e20 > e60;
-  // 空头排列: 价格 < EMA5 < EMA20 < EMA60
   const bearAlign = price < e5 && e5 < e20 && e20 < e60;
-  // 趋势方向
-  const trend = e5 > e20 ? 1 : -1;  // +1 上升趋势, -1 下降趋势
+  const trend = e5 > e20 ? 1 : -1;
 
-  // ── 4. 综合判断市场状态 ─────────────────────────────────────────────
   let state, label;
   if (atrPct > 5) {
-    // ATR > 5%：高波动
     state = 'high_volatility';
     label = '高波动';
   } else if (adx > 25 && bullAlign) {
-    // ADX > 25 + 多头排列：上升趋势
     state = 'trending_up';
     label = '上升趋势';
   } else if (adx > 25 && bearAlign) {
-    // ADX > 25 + 空头排列：下降趋势
     state = 'trending_down';
     label = '下降趋势';
   } else {
-    // ADX < 25：震荡市
     state = 'ranging';
     label = '震荡市';
   }
@@ -1343,8 +1211,6 @@ function classifyMarketState(klines) {
            bullAlign, bearAlign, e5, e20, e60 };
 }
 
-// ── 状态感知权重管理 ──────────────────────────────────────────────────────
-// 每种市场状态有独立的模型权重
 const DEFAULT_WEIGHTS_BY_STATE = {
   trending_up:     { gann: 0.40, chan: 0.30, sr: 0.20, harmonic: 0.10 },
   trending_down:   { gann: 0.35, chan: 0.35, sr: 0.20, harmonic: 0.10 },
@@ -1353,13 +1219,11 @@ const DEFAULT_WEIGHTS_BY_STATE = {
 };
 
 function getWeightsByState(state) {
-  // 从 localStorage 读取该状态的学习权重，否则用默认值
   const stored = localStorage.getItem('weights_' + state);
   const base   = DEFAULT_WEIGHTS_BY_STATE[state] || DEFAULT_WEIGHTS_BY_STATE.ranging;
   if (!stored) return { ...base };
   try {
     const parsed = JSON.parse(stored);
-    // 合并存储的权重（归一化）
     const merged = { ...base, ...parsed };
     const total  = Object.values(merged).reduce((s,v)=>s+v,0);
     Object.keys(merged).forEach(k => merged[k] /= total);
@@ -1374,15 +1238,11 @@ function saveWeightsByState(state, weights) {
   localStorage.setItem('weights_' + state, JSON.stringify(norm));
 }
 
-// 当前推演的市场状态（由 runDashboard 设置，供其他函数读取）
 let _currentMarketState = { state: 'ranging', label: '震荡市' };
 
-// ── 江恩步长最优化（通过历史误差找最优 step）─────────────────────────────
-// 测试 step 值范围 [1.0, 3.0]，找使预测误差最小的步长
-// historyData: [{ date, price, actualPrice3d }] 至少10条
 function calculateOptimalStep(historyData) {
   if (!historyData || historyData.length < 5) {
-    return parseFloat(localStorage.getItem('gann_step') || '2');
+    return parseFloat(_localStorage.getItem('gann_step') || '2');
   }
   let bestStep = 2, bestErr = Infinity;
   for (let step = 1.0; step <= 3.5; step += 0.25) {
@@ -1390,7 +1250,6 @@ function calculateOptimalStep(historyData) {
     historyData.forEach(({ price, actualPrice3d }) => {
       if (!price || !actualPrice3d) return;
       const sqP  = Math.sqrt(price);
-      // 最近上方方格位
       const next = Math.pow(sqP + step, 2);
       const err  = Math.abs(next - actualPrice3d) / actualPrice3d;
       totalErr  += err;
@@ -1398,25 +1257,20 @@ function calculateOptimalStep(historyData) {
     const avgErr = totalErr / historyData.length;
     if (avgErr < bestErr) { bestErr = avgErr; bestStep = step; }
   }
-  console.log(`最优江恩步长: ${bestStep}（误差 ${(bestErr*100).toFixed(2)}%）`);
-  localStorage.setItem('gann_step', bestStep.toString());
+  _localStorage.setItem('gann_step', bestStep.toString());
   return bestStep;
 }
 
-// ── 缠论分型窗口最优化 ────────────────────────────────────────────────────
 function calculateOptimalFractalWindow(historyData) {
   if (!historyData || historyData.length < 5) {
-    return parseInt(localStorage.getItem('chan_fractal_window') || '1');
+    return parseInt(_localStorage.getItem('chan_fractal_window') || '1');
   }
-  // 窗口 1-3：较小窗口敏感但多噪声，较大窗口稳定但滞后
-  // 用方向准确率评估
   let bestW = 1, bestAcc = 0;
   for (let w = 1; w <= 3; w++) {
     let correct = 0;
     historyData.forEach(({ date, coin, price, high, low, actualDir }) => {
       if (!price) return;
-      // 临时存储窗口值
-      localStorage.setItem('chan_fractal_window', w.toString());
+      _localStorage.setItem('chan_fractal_window', w.toString());
       const ch  = engineChan(coin || 'BTC', date || '2024-01-01', price, high || price*1.1, low || price*0.9, 0);
       const dir = ch.biDir === 'up' ? 'bull' : 'bear';
       if (dir === actualDir) correct++;
@@ -1424,24 +1278,21 @@ function calculateOptimalFractalWindow(historyData) {
     const acc = correct / historyData.length;
     if (acc > bestAcc) { bestAcc = acc; bestW = w; }
   }
-  console.log(`最优缠论分型窗口: ${bestW}（方向准确率 ${(bestAcc*100).toFixed(1)}%）`);
-  localStorage.setItem('chan_fractal_window', bestW.toString());
+  _localStorage.setItem('chan_fractal_window', bestW.toString());
   return bestW;
 }
 
-// ── 从误差记录中提取历史数据，批量运行参数优化 ───────────────────────────
 function runParamOptimization() {
-  const errors = JSON.parse(localStorage.getItem('err_price') || '[]');
+  const errors = JSON.parse(_localStorage.getItem('err_price') || '[]');
   if (errors.length < 5) {
     alert('需要至少5条误差记录才能运行参数优化\n请先完成历史回测');
     return;
   }
-  // 构建优化用数据：{ price, actualPrice3d, date }
   const histData = errors
     .filter(e => e.predicted && e.actual)
     .map(e => ({
       date:          e.date,
-      price:         e.predicted,  // 预测时的价格（接近入场价）
+      price:         e.predicted,
       actualPrice3d: e.actual,
       actualDir:     e.actual > e.predicted ? 'bull' : 'bear',
     }));
@@ -1449,7 +1300,6 @@ function runParamOptimization() {
   const bestStep = calculateOptimalStep(histData);
   const bestWin  = calculateOptimalFractalWindow(histData);
 
-  // 更新面板显示
   const stepEl = document.getElementById('paramGannStep');
   const winEl  = document.getElementById('paramChanWindow');
   if (stepEl) stepEl.value = bestStep;
@@ -1463,18 +1313,14 @@ function engineGann(coin, date, price, high, low) {
   const H = high || P * 1.18;
   const L = low || P * 0.82;
   
-  // ========== 真正的江恩九方格 ==========
   const sqrtP = Math.sqrt(P);
-  const angle = (sqrtP % 2) * 180; // 当前在螺旋上的角度（0-360°）
+  const angle = (sqrtP % 2) * 180;
   
-  // 计算关键支撑阻力位（同一角度线上的价格）
   const levels = [];
   for (let n = -8; n <= 8; n++) {
     if (n === 0) continue;
-    // gannStep: 九方格步长。默认=2（标准一圈），可通过误差回测优化
-    // 从 localStorage 读取，允许手动/自动校准
-    const gannStep    = parseFloat(localStorage.getItem('gann_step') || '2');
-    const sqrtLevel   = sqrtP + n * gannStep; // 参数化步长
+    const gannStep    = parseFloat(_localStorage.getItem('gann_step') || '2');
+    const sqrtLevel   = sqrtP + n * gannStep;
     if (sqrtLevel <= 0) continue;
     
     const priceLevel = Math.pow(sqrtLevel, 2);
@@ -1490,12 +1336,9 @@ function engineGann(coin, date, price, high, low) {
     });
   }
   
-  // 按距离当前价格排序
   levels.sort((a, b) => Math.abs(a.pct) - Math.abs(b.pct));
   
-  // ========== 江恩角度线 ==========
-  const scale = Math.sqrt(L); // 价格单位
-  // 从起点到目标日的天数
+  const scale = Math.sqrt(L);
   const birthDate = NATAL_CHARTS[coin]?.date ? new Date(NATAL_CHARTS[coin].date) : new Date('2009-01-03');
   const targetDate = new Date(date);
   const daysFromBase = Math.max(1, Math.floor((targetDate - birthDate) / 86400000) % 360);
@@ -1524,12 +1367,9 @@ function engineGann(coin, date, price, high, low) {
     };
   }).filter(a => a.isValid);
   
-  // ========== 计算偏向 ==========
-  // 角度线位置判断
   const aboveAngles = angles.filter(a => a.isAbove).length;
-  const angleBias = (aboveAngles / angles.length) * 2 - 1; // -1 到 1
+  const angleBias = (aboveAngles / angles.length) * 2 - 1;
   
-  // 九方格最近位置判断
   const nearestAbove = levels.find(l => l.isAbove);
   const nearestBelow = levels.find(l => !l.isAbove);
   let squareBias = 0;
@@ -1539,11 +1379,8 @@ function engineGann(coin, date, price, high, low) {
     squareBias = (distToBelow - distToAbove) / (distToAbove + distToBelow);
   }
   
-  // 综合偏向（角度线60% + 九方格40%）
   const bias = angleBias * 0.6 + squareBias * 0.4;
   
-  // ========== 置信度计算 ==========
-  // 基于价格在方格中的位置和角度线距离
   const nearestLevel = levels[0];
   const nearestAngle = angles.sort((a, b) => Math.abs(a.pct) - Math.abs(b.pct))[0];
   
@@ -1552,11 +1389,9 @@ function engineGann(coin, date, price, high, low) {
   
   const confidence = Math.min(0.95, (levelConf + angleConf) / 2);
   
-  // 最接近当前价的角度线（用于 UI 显示）
   const sortedAngles   = [...angles].sort((a, b) => Math.abs(a.pct) - Math.abs(b.pct));
   const closestAngle   = sortedAngles[0];
 
-  // s9 Cardinal levels（九方格四正位：0°/90°/180°/270°）
   const cardinalAngles = [0, 90, 180, 270];
   const cardinalLevels = [];
   for (let ring = 1; ring <= 6; ring++) {
@@ -1576,7 +1411,6 @@ function engineGann(coin, date, price, high, low) {
     });
   }
 
-  // 价格倍数目标（前高前低 × 江恩比率）
   const GANN_MULT_LIST = [
     { label: '×1/8', mult: 0.125 }, { label: '×1/4', mult: 0.25 },
     { label: '×3/8', mult: 0.375 }, { label: '×1/2', mult: 0.5  },
@@ -1596,23 +1430,20 @@ function engineGann(coin, date, price, high, low) {
   return {
     bias: Math.max(-1, Math.min(1, bias)),
     conf: confidence,
-    // ── 核心字段 ──
     sqrtP:       sqrtP.toFixed(4),
-    sqP:         sqrtP.toFixed(4),   // 别名（buildGannPanel 用 gn.sqP）
+    sqP:         sqrtP.toFixed(4),
     angle:       angle.toFixed(1),
     levels:      levels.slice(0, 16),
     angles,
     P, H, L,
     daysFromBase,
-    multiples,          // 价格倍数目标
-    cardinalLevels,     // 四正位（顶层兼容）
-    // ── 兼容字段（buildGannPanel / drawGannCanvas 所需）──
+    multiples,
+    cardinalLevels,
     activeAng:   closestAngle?.deg ?? 45,
     cycAngle:    angle.toFixed(1),
     cycle:       daysFromBase,
     res:         levels.filter(l =>  l.isAbove).slice(0, 5),
     sup:         levels.filter(l => !l.isAbove).slice(0, 5),
-    // s9：完整九方格摘要（含 cardinalLevels）
     s9: {
       sqP:           sqrtP.toFixed(4),
       angle:         angle.toFixed(1),
@@ -1620,24 +1451,20 @@ function engineGann(coin, date, price, high, low) {
       cardinalLevels: cardinalLevels.slice(0, 24),
     },
 
-    // ── 区间输出（Layer 4：从点到区间）─────────────────────────────────
-    // 支撑区间：最近两个支撑位之间的价格带
     supportZone: (() => {
       const sups = levels.filter(l => !l.isAbove).slice(0, 2);
       if (sups.length >= 2) return { low: sups[1].price, high: sups[0].price };
       if (sups.length === 1) return { low: sups[0].price * 0.995, high: sups[0].price };
       return null;
     })(),
-    // 阻力区间：最近两个阻力位之间的价格带
     resistanceZone: (() => {
       const ress = levels.filter(l => l.isAbove).slice(0, 2);
       if (ress.length >= 2) return { low: ress[0].price, high: ress[1].price };
       if (ress.length === 1) return { low: ress[0].price, high: ress[0].price * 1.005 };
       return null;
     })(),
-    // 入场区间（当前价附近±1个步长内）
     entryZone: (() => {
-      const gStep = parseFloat(localStorage.getItem('gann_step') || '2');
+      const gStep = parseFloat(_localStorage.getItem('gann_step') || '2');
       const sqP   = Math.sqrt(P);
       return {
         low:  Math.round(Math.pow(sqP - gStep * 0.5, 2) * 100) / 100,
@@ -1646,25 +1473,17 @@ function engineGann(coin, date, price, high, low) {
     })(),
   };
 }
-// ── 江恩时间价格目标自动推算引擎 ────────────────────────────────────────
-// 全自动：根据当前价/高低点/基准日期推算角度线目标、目标日期、修正目标
 function engineGannTime(date, price, high, low) {
   const P  = price || 50000;
   const H  = high  || P * 1.15;
   const L  = low   || P * 0.85;
   const baseD = new Date(date);
 
-  const range = H - L;                          // 波动幅度
-  const rangePct = range / L;                   // 幅度百分比
+  const range = H - L;
+  const rangePct = range / L;
 
-  // ── 1. 角度线强弱判断（基于价格位置，不用平方根角度）──────────────────
-  // 当前价在高低点区间的相对位置
-  const posInRange = (P - L) / range;           // 0=前低，1=前高，>1=突破前高
+  const posInRange = (P - L) / range;
 
-  // 角度线强弱：看当前价相对于前高的位置
-  // 完好：价格高于前高的80% → 仍在强势区
-  // 偏弱：价格在前高50%-80% → 走弱
-  // 失效：价格低于前高50% → 已跌破
   const angleStrength =
     P >= H * 0.92 ? 'intact' :
     P >= H * 0.80 ? 'fading' : 'weak';
@@ -1674,51 +1493,39 @@ function engineGannTime(date, price, high, low) {
     angleStrength === 'fading' ? '角度线偏弱 · 目标下修' :
                                  '已跌破角度线 · 原目标失效';
 
-  // ── 2. 原目标 AT（强势1×1角度线，前高×1.272黄金扩展）──────────────────
-  // 限制：目标价不能超过当前价的 50%（单波段不现实）
   const AT_raw = Math.round(H * 1.272);
   const AT = Math.min(AT_raw, Math.round(P * 1.50));
 
-  // ── 3. 修正目标 AR（跌破后按走势强弱下修）──────────────────────────────
   const AR_raw =
     angleStrength === 'intact' ? AT :
     angleStrength === 'fading' ? Math.round(H * 1.05) :
                                  Math.round(H * 1.00);
-  // 修正目标同样限制在当前价 ±40% 内
   const AR = Math.min(AR_raw, Math.round(P * 1.40));
 
-  // ── 4. 目标日期（合理范围：14-365天）────────────────────────────────────
-  // 幅度越大需要越多时间；同时按目标与当前价的距离校正
-  // 每涨10%约需30天（保守估算）
   const pctToTarget = Math.abs(AR - P) / P;
   const baseDays = Math.round((pctToTarget / 0.10) * 30);
   const multiplier = angleStrength === 'intact' ? 1.0 : angleStrength === 'fading' ? 1.5 : 2.0;
-  // 最少14天（不可能明天就到），最多365天
   const daysToTarget = Math.min(365, Math.max(14, Math.round(baseDays * multiplier)));
 
   const targetD = new Date(baseD);
   targetD.setDate(targetD.getDate() + daysToTarget);
 
-  // ── 5. 关键时间节点（按黄金比例切分）──────────────────────────────────
   const keyRatios = [0.25, 0.5, 0.618, 0.786, 1.0];
   const keyDays = keyRatios.map(r => Math.max(1, Math.round(daysToTarget * r)));
 
   const keyNodes = keyDays.map(d => {
     const dt = new Date(baseD);
     dt.setDate(dt.getDate() + d);
-    // 线性插值价格（从当前价到修正目标）
     const projPrice = Math.round(P + (AR - P) * (d / daysToTarget));
     return { days: d, date: dt, price: projPrice };
   });
 
-  // ── 6. 次高点（背驰后回落幅度约3-6%）──────────────────────────────────
   const subHighA = Math.round(AR * 0.97);
   const subHighB = Math.round(AR * 0.94);
 
   const gapFromOriginal = ((AT - P) / P * 100).toFixed(1);
   const gapFromRevised  = ((AR - P) / P * 100).toFixed(1);
 
-  // ── 7. 推演路径 ──────────────────────────────────────────────────────────
   const scenario = {
     A: {
       label: '路径A · 强势突破',
@@ -1746,8 +1553,7 @@ function engineGannTime(date, price, high, low) {
     },
   };
 
-  // ── Bear target: project downward from current low ──
-  const AB = Math.round(L - (H - L) * 0.382);   // 下行目标：前低再跌38.2%幅度
+  const AB = Math.round(L - (H - L) * 0.382);
 
   return {
     P, H, L, AT, AR, AB,
@@ -1758,7 +1564,6 @@ function engineGannTime(date, price, high, low) {
     scenario, subHighA, subHighB,
     dailyGain: ((AR - P) / (daysToTarget||1)).toFixed(0),
     keyNodes,
-    // legacy fields for display
     angleHL: ((Math.sqrt(H) - Math.sqrt(L)) * 180).toFixed(1),
     angToAR: ((Math.sqrt(AR) - Math.sqrt(P)) * 180).toFixed(1),
   };
@@ -1778,14 +1583,13 @@ function engineHarmonic(coin, date, price, high, low) {
     if(!active) return;
 
     const bullish = r2() > 0.5;
-    const completion = r2()*0.4 + 0.55; // 55-95% complete
+    const completion = r2()*0.4 + 0.55;
 
-    // Points
     const X = bullish ? L : H;
     const A = bullish ? H : L;
     const B = bullish ? A - range*h.xab : A + range*h.xab;
     const C = bullish ? B + range*h.abc : B - range*h.abc;
-    const D = bullish ? B - range*h.bcd*0.3 : B + range*h.bcd*0.3; // target
+    const D = bullish ? B - range*h.bcd*0.3 : B + range*h.bcd*0.3;
     const potR = bullish ? C + range*0.382 : C - range*0.382;
 
     const conf = 0.45 + r2()*0.45;
@@ -1817,7 +1621,6 @@ function engineSR(coin, date, price, high, low) {
 
   const levels = [];
 
-  // Psychological / round number levels
   const mag = P >= 10000 ? 1000 : P >= 1000 ? 100 : P >= 100 ? 10 : P >= 10 ? 1 : 0.1;
   const base = Math.round(P / mag) * mag;
   for(let i=-10; i<=10; i++) {
@@ -1827,7 +1630,6 @@ function engineSR(coin, date, price, high, low) {
       levels.push({ price:+lp.toFixed(4), type:lp>P?'res':'sup', method:'心理价位', strength:0.45+r()*0.3 });
   }
 
-  // Gann square levels (江恩方格)
   const sqP = Math.sqrt(P);
   for(let i=-6; i<=6; i++) {
     if(i===0) continue;
@@ -1836,15 +1638,12 @@ function engineSR(coin, date, price, high, low) {
       levels.push({ price:Math.round(lp*100)/100, type:lp>P?'res':'sup', method:'江恩方格', strength:0.55+r()*0.3 });
   }
 
-  // Swing high/low derived levels
   if(H > P) levels.push({ price:Math.round(H), type:'res', method:'近期高点', strength:0.75 });
   if(L < P) levels.push({ price:Math.round(L), type:'sup', method:'近期低点', strength:0.75 });
-  // Mid-range
   const mid = Math.round((H+L)/2);
   if(mid > P) levels.push({ price:mid, type:'res', method:'区间中轴', strength:0.5+r()*0.2 });
   if(mid < P) levels.push({ price:mid, type:'sup', method:'区间中轴', strength:0.5+r()*0.2 });
 
-  // Deduplicate
   const seen = new Set();
   const unique = levels.filter(l => {
     const key = Math.round(l.price / (P*0.004));
@@ -1862,8 +1661,6 @@ function engineSR(coin, date, price, high, low) {
   const bias = (P-nearestSup)/(nearestRes-nearestSup)*2-1;
   const conf = 0.5+r()*0.35;
 
-  // ── 区间聚合：将相近的支撑/阻力位合并成区间 ───────────────────────
-  // 阈值：价格差 < 1.5% 的视为同一区间
   const clusterZones = (levels, wantAbove) => {
     const sorted = levels.slice().sort((a,b) => wantAbove ? a.price-b.price : b.price-a.price);
     const zones  = [];
@@ -1889,31 +1686,24 @@ function engineSR(coin, date, price, high, low) {
 
   return {
     res, sup, bias: Math.max(-1,Math.min(1,bias)), conf, P,
-    // 区间输出（Layer 4：从点到区间）
-    supZones,   // 支撑区间列表 [{low, high, mid, strength}]
-    resZones,   // 阻力区间列表
-    // 最优入场区间（最近支撑区间 ~ 当前价）
+    supZones,
+    resZones,
     entryZone: supZones[0]
       ? { low: supZones[0].low, high: Math.min(P, supZones[0].high * 1.005) }
       : null,
   };
 }
 
-// ═══════════════════════════════════════════════
-// TP / SL ENGINE (止盈 / 止损推算)
-// ═══════════════════════════════════════════════
 function engineTPSL(coin, date, price, high, low, engines) {
   const P = Number(price) || 50000;
   const H = Number(high)  || P * 1.15;
   const L = Number(low)   || P * 0.85;
   const { sr, gn, ch, hr, nt } = engines || {};
 
-  // ── 1. ATR计算（真实波幅百分比）─────────────────────────────────────
   const atrAbs = H - L;
-  const atrPct = atrAbs / P;            // 小数形式，如 0.035 = 3.5%
+  const atrPct = atrAbs / P;
   const atrPctStr = (atrPct * 100).toFixed(1) + '%';
 
-  // ── 2. 动态倍数（根据波动率自动调整）────────────────────────────────
   let tpMult, slMult, volatilityLabel;
   if (atrPct < 0.02) {
     tpMult = 3.0; slMult = 1.5; volatilityLabel = '低波动';
@@ -1925,7 +1715,6 @@ function engineTPSL(coin, date, price, high, low, engines) {
     tpMult = 1.5; slMult = 0.8; volatilityLabel = '极高波动';
   }
 
-  // ── 3. 方向判断（与原有逻辑一致）────────────────────────────────────
   const _sw = (typeof getWeightsByState === 'function')
     ? getWeightsByState((_currentMarketState||{}).state || 'ranging')
     : { gann:0.35, chan:0.25, sr:0.25, harmonic:0.15 };
@@ -1941,13 +1730,10 @@ function engineTPSL(coin, date, price, high, low, engines) {
   const signal  = avgBias > 0.15 ? 'LONG' : avgBias < -0.15 ? 'SHORT' : 'NEUTRAL';
   const isShort = signal === 'SHORT';
 
-  // ── 4. 五档止盈计算 ──────────────────────────────────────────────────
-  // 基础ATR倍数梯度
   const TP_MULTS    = [1.5, 2.0, 2.5, 3.0, tpMult];
   const TP_LABELS   = ['TP1 保守', 'TP2 稳健', 'TP3 均衡', 'TP4 进取', 'TP5 终极'];
   const TP_SOURCES  = ['ATR×1.5', 'ATR×2.0', 'ATR×2.5', 'ATR×3.0', `ATR×${tpMult}(${volatilityLabel})`];
 
-  // 江恩阻力位（供TP取较大值）
   const gannResist = [];
   const gannSupport = [];
   if (gn?.levels) {
@@ -1969,12 +1755,10 @@ function engineTPSL(coin, date, price, high, low, engines) {
     return Math.round(v * 1000) / 1000;
   };
 
-  // 做多：TP = max(ATR×mult, 下一个阻力位)；做空反向
   const tpLevelsRaw = TP_MULTS.map((m, i) => {
     const atrTarget = isShort
       ? P * (1 - atrPct * m)
       : P * (1 + atrPct * m);
-    // 取与关键位的较优值（做多取较大，做空取较小）
     let price_tp = atrTarget;
     if (!isShort && gannResist.length) {
       const nearRes = gannResist.find(r => r >= atrTarget);
@@ -1993,8 +1777,6 @@ function engineTPSL(coin, date, price, high, low, engines) {
     };
   });
 
-  // ── 5. 止损计算 ──────────────────────────────────────────────────────
-  // SL = min(ATR×slMult, 下一个支撑位) 取更紧的
   const atrSL = isShort
     ? P * (1 + atrPct * slMult)
     : P * (1 - atrPct * slMult);
@@ -2002,7 +1784,6 @@ function engineTPSL(coin, date, price, high, low, engines) {
   let slPrice = atrSL;
   if (!isShort && gannSupport.length) {
     const nearSup = gannSupport[0];
-    // 取较小的（更紧的止损保护资金）
     if (nearSup && nearSup < P && nearSup > P * 0.5) slPrice = Math.min(atrSL, nearSup);
   } else if (isShort && gannResist.length) {
     const nearRes = gannResist[0];
@@ -2021,7 +1802,6 @@ function engineTPSL(coin, date, price, high, low, engines) {
   const primarySL = slPrice;
   const risk = Math.abs(P - primarySL);
 
-  // ── 6. 加入RRR到TP层 ────────────────────────────────────────────────
   const tpWithRRR = tpLevelsRaw.map(tp => {
     const reward = Math.abs(tp.price - P);
     const rrr    = risk > 0 ? (reward / risk).toFixed(2) : '∞';
@@ -2029,34 +1809,28 @@ function engineTPSL(coin, date, price, high, low, engines) {
     return { ...tp, reward: smartR(reward), rrr, pct };
   });
 
-  // 首要TP做RRR汇总
   const primaryRRR = risk > 0 ? (Math.abs(tpLevelsRaw[4].price - P) / risk).toFixed(2) : '∞';
 
-  // ── 7. 凯利公式建议仓位 ─────────────────────────────────────────────
   const errors = window.tracker?.priceErrors || [];
   const recentN = Math.min(50, errors.length);
   const recent  = errors.slice(-recentN);
   const wins    = recent.filter(e=>e.dirCorrect).length;
-  const p_win   = recentN > 5 ? wins / recentN : 0.55;  // 默认55%
+  const p_win   = recentN > 5 ? wins / recentN : 0.55;
   const p_lose  = 1 - p_win;
-  const b       = parseFloat(primaryRRR) || 2.0;         // 盈亏比
+  const b       = parseFloat(primaryRRR) || 2.0;
   const kelly_f = (p_win * b - p_lose) / b;
-  // 半凯利，最大25%
   const positionPct = Math.max(0, Math.min(25, Math.round(kelly_f * 0.5 * 100)));
 
-  // ── 8. 入场区间 ──────────────────────────────────────────────────────
   const entryZone = isShort
     ? { low: smartR(P * 0.998), high: smartR(P * 1.015) }
     : { low: smartR(P * 0.985), high: smartR(P * 1.002) };
 
   return {
-    // 原有兼容字段
     P, tpLevels: tpWithRRR, slLevels, primarySL,
     risk: smartR(risk), atrPct: (atrPct*100).toFixed(1), atrAbs: smartR(atrAbs),
     avgBias, signal, isShort, entryZone,
     weightCalibrated: (window.tracker?.priceErrors?.length || 0) >= 10,
 
-    // 新增规范字段（符合需求文档格式）
     tpLevels5: tpWithRRR.map((tp,i) => ({
       level: i+1, price: tp.price, label: TP_LABELS[i]
     })),
@@ -2072,17 +1846,10 @@ function engineTPSL(coin, date, price, high, low, engines) {
     },
   };
 }
-// ═══════════════════════════════════════════════
-// ═══════════════════════════════════════════════
-// GANN TP/SL ENGINE — 五档江恩九方格止盈止损
-// 以江恩九方格 (Square of Nine) 六大角度位为唯一锚点
-// ═══════════════════════════════════════════════
 
-// 计算给定基准价 P 的江恩九方格关键位
 function gannS9Levels(P) {
   const sqP = Math.sqrt(P);
   const levels = [];
-  // 每整圈 = +2 in √P space；关键分割角：45°=0.25圈, 90°=0.5, 135°=0.75, 180°=1.0, 360°=2.0
   const angFracs = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0];
   angFracs.forEach(f => {
     const up   = Math.round(Math.pow(sqP + f * 2, 2));
@@ -2093,49 +1860,39 @@ function gannS9Levels(P) {
 }
 
 
-// 核心：以任意价格 baseP 为当前价，计算 5 档 TP/SL
-// baseP 可以是当前价，也可以是节点预测价 — 这样每节点不同
 function calcGannFibTPSL(baseP, H, L, engines, isLong) {
   const P = baseP;
 
   const { gn, ch, sr } = engines || {};
 
-  // ── 江恩九方格角度位 ──
   const s9 = gannS9Levels(P);
   const s9Up   = s9.map(l => ({ price: l.up,   label: '江恩' + l.label, src:'gann' })).filter(v => v.price > P).sort((a,b) => a.price - b.price);
   const s9Down = s9.map(l => ({ price: l.down,  label: '江恩' + l.label, src:'gann' })).filter(v => v.price < P).sort((a,b) => b.price - a.price);
 
-  // ── 江恩引擎额外角度线 ──
   const gnUp   = gn && gn.levels ? gn.levels.filter(l => l.price > P).slice(0,6).map(l => ({ price: l.price, label: '江恩角度线', src:'gann' })) : [];
   const gnDown = gn && gn.levels ? gn.levels.filter(l => l.price < P).slice(-6).map(l => ({ price: l.price, label: '江恩角度线', src:'gann' })) : [];
 
-  // ── 缠论中枢 + 背驰价位 ──
   const chanUp = [], chanDown = [];
   if (ch) {
-    // 中枢上沿作为压力（TP候选），中枢下沿作为支撑（SL候选）
     if (ch.zsHigh && ch.zsHigh > P) chanUp.push({ price: ch.zsHigh, label: '缠论中枢上沿', src:'chan' });
     if (ch.zsLow  && ch.zsLow  < P) chanDown.push({ price: ch.zsLow, label: '缠论中枢下沿', src:'chan' });
-    // 背驰目标价：顶背驰→做空TP；底背驰→做多TP
     if (ch.beichi && ch.beichiType === '顶背驰' && ch.zsHigh) {
-      const beiTarget = smartRound(ch.zsHigh * 0.9); // 顶背驰下跌目标
+      const beiTarget = smartRound(ch.zsHigh * 0.9);
       if (beiTarget < P) chanDown.push({ price: beiTarget, label: '缠论顶背驰目标', src:'chan' });
     }
     if (ch.beichi && ch.beichiType === '底背驰' && ch.zsLow) {
-      const beiTarget = smartRound(ch.zsLow * 1.15); // 底背驰反弹目标
+      const beiTarget = smartRound(ch.zsLow * 1.15);
       if (beiTarget > P) chanUp.push({ price: beiTarget, label: '缠论底背驰目标', src:'chan' });
     }
-    // 买卖点价位
     if (ch.bspDir === '买点' && ch.zsHigh && ch.zsHigh > P)
       chanUp.push({ price: ch.zsHigh, label: '缠论买点目标位', src:'chan' });
     if (ch.bspDir === '卖点' && ch.zsLow && ch.zsLow < P)
       chanDown.push({ price: ch.zsLow, label: '缠论卖点目标位', src:'chan' });
   }
 
-  // ── 斐波那契回撤（大波段）──
   const fibUp = [], fibDown = [];
   if (H && L && H > L) {
     const range = H - L;
-    // 上方斐波: 低点+38.2%, +50%, +61.8%
     [0.382, 0.500, 0.618, 1.000].forEach(r => {
       const fp = smartRound(L + range * r);
       if (fp > P) fibUp.push({ price: fp, label: `斐波${Math.round(r*100)}%`, src:'fib' });
@@ -2143,9 +1900,6 @@ function calcGannFibTPSL(baseP, H, L, engines, isLong) {
     });
   }
 
-  // ── 合并所有候选，去重，正确排序 ──
-  // allUp: 升序 (nearest above first → TP1最近, TP5最远)
-  // allDown: 降序 (nearest below first → SL1最近, SL5最远)
   const dedupAsc = (arr) => {
     const seen = new Set();
     return arr.filter(v => v.price > P)
@@ -2159,7 +1913,7 @@ function calcGannFibTPSL(baseP, H, L, engines, isLong) {
   const dedupDesc = (arr) => {
     const seen = new Set();
     return arr.filter(v => v.price < P)
-      .sort((a,b) => b.price - a.price)  // descending: nearest below first
+      .sort((a,b) => b.price - a.price)
       .filter(v => {
         const key = Math.round(v.price / (P * 0.005));
         if (seen.has(key)) return false;
@@ -2209,7 +1963,6 @@ function engineTPSL5(coin, date, price, high, low, engines) {
   const L = low   || P * 0.82;
 
   const { sr, gn, ch, hr } = engines || {};
-  // 使用误差校正权重（与 engineTPSL 保持一致）
   const _sw5 = (typeof getWeightsByState === 'function')
     ? getWeightsByState(_currentMarketState?.state || 'ranging')
     : { gann:0.35, chan:0.25, sr:0.25, harmonic:0.15 };
@@ -2225,7 +1978,6 @@ function engineTPSL5(coin, date, price, high, low, engines) {
   const signal   = avgBias > 0.15 ? 'LONG' : avgBias < -0.15 ? 'SHORT' : 'NEUTRAL';
   const isLong  = signal !== 'SHORT';
 
-  // 计算 LONG / SHORT 两套策略（基于当前价 P）
   const longStrats  = calcGannFibTPSL(P, H, L, engines, true);
   const shortStrats = calcGannFibTPSL(P, H, L, engines, false);
 
@@ -2238,28 +1990,18 @@ function engineTPSL5(coin, date, price, high, low, engines) {
     };
   });
 
-  // 江恩九方格总览（供 UI 展示）
   const s9Overview = gannS9Levels(P);
 
   return { signal, avgBias, strategies, s9Overview, P, H, L };
 }
 
-// ══════════════════════════════════════════════════════════════════
-// 缠论引擎 — 顶底分型·笔·中枢·背驰（全确定性，无随机数）
-// 算法：① 日期特征生成确定性K线序列（三角波+趋势）
-//       ② 合并包含K线 ③ 识别顶底分型 ④ 交替分型形成笔
-//       ⑤ 三笔重叠区识别中枢 ⑥ 同向笔幅度比较检测背驰
-//       ⑦ 中枢位置+笔方向+背驰信号 → 综合偏向
-// ══════════════════════════════════════════════════════════════════
 function engineChan(coin, date, price, high, low, breakLevel) {
   const P = price || 50000;
   const H = high  || P * 1.15;
   const L = low   || P * 0.85;
 
-  // ── 1. 确定性K线序列（三角波模拟，无随机数）────────────────────
   const d = new Date(date);
   const dayOfYear = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
-  // 确定性趋势种子（仅依赖日期）
   const trendSeed     = ((dayOfYear * 17 + d.getFullYear() * 7) % 100) / 100;
   const range         = H - L;
   const volatility    = range * 0.018;
@@ -2269,7 +2011,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
   let basePrice = L + range * trendSeed;
 
   for (let i = 0; i < 100; i++) {
-    // 双周期三角波（完全确定性）
     const cycle1 = Math.cos(i * Math.PI / 8) * volatility * 1.5;
     const cycle2 = Math.cos(i * Math.PI / 3) * volatility * 0.8;
     const trend  = trendStrength * volatility * (i / 50);
@@ -2278,7 +2019,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     const open    = basePrice;
     const bodyH   = Math.max(open, close);
     const bodyL   = Math.min(open, close);
-    // 影线长度由索引奇偶确定（无随机）
     const shadowU = volatility * (i % 3 === 0 ? 0.4 : 0.2);
     const shadowD = volatility * (i % 3 === 1 ? 0.4 : 0.2);
 
@@ -2293,7 +2033,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     if (basePrice < L * 1.02) basePrice = L * 1.05;
   }
 
-  // ── 2. 合并包含K线 ─────────────────────────────────────────────
   const merged = [];
   for (let i = 0; i < klines.length; i++) {
     if (!merged.length) { merged.push({ ...klines[i] }); continue; }
@@ -2308,14 +2047,10 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     }
   }
 
-  // ── 3. 识别顶底分型 ────────────────────────────────────────────
-  // fractalWindow: 顶底分型确认窗口，默认=1（左右各1根K线）
-  // 值越大要求越严格（需要更多K线确认），减少假信号但更滞后
-  const fractalWindow = parseInt(localStorage.getItem('chan_fractal_window') || '1');
+  const fractalWindow = parseInt(_localStorage.getItem('chan_fractal_window') || '1');
   const tops = [], bottoms = [];
   for (let i = fractalWindow; i < merged.length - fractalWindow; i++) {
     const cu = merged[i];
-    // 顶分型：中间K线高点 > 左右 fractalWindow 根K线的所有高点
     let isTop = true, isBot = true;
     for (let w = 1; w <= fractalWindow; w++) {
       if (cu.high <= merged[i-w].high || cu.high <= merged[i+w].high) isTop = false;
@@ -2325,7 +2060,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     if (isBot) bottoms.push({ index: i, price: cu.low, type: 'bottom' });
   }
 
-  // ── 4. 分型交替 → 笔 ───────────────────────────────────────────
   const fractures = [...tops, ...bottoms].sort((a, b) => a.index - b.index);
   const pens = [];
   for (let i = 1; i < fractures.length; i++) {
@@ -2340,7 +2074,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     }
   }
 
-  // ── 5. 中枢（最近三笔的重叠区间）────────────────────────────────
   let zsHigh = null, zsLow = null;
   if (pens.length >= 3) {
     const last3  = pens.slice(-3);
@@ -2351,7 +2084,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     if (zsLow >= zsHigh) { zsHigh = null; zsLow = null; }
   }
 
-  // ── 6. 背驰检测 ────────────────────────────────────────────────
   let beichi = false, beichiType = null;
   if (pens.length >= 5) {
     const lastPen = pens[pens.length - 1];
@@ -2364,7 +2096,6 @@ function engineChan(coin, date, price, high, low, breakLevel) {
     }
   }
 
-  // ── 7. 偏向计算 ────────────────────────────────────────────────
   let bias = 0;
   if (zsHigh != null && zsLow != null) {
     bias += P > zsHigh ? 0.35 : P < zsLow ? -0.35 : 0.05;
@@ -2396,29 +2127,11 @@ function engineChan(coin, date, price, high, low, breakLevel) {
 }
 
 
-// ════════════════════════════════════════════════════════════════════════════
-// 江恩×缠论协同引擎 v2 — 基于真实K线数据
-// 数据来源：fetchKlines() 返回的真实OHLCV K线
-// 五大核心计算：
-//   ① 江恩斐波关键位（高低区间×0.382/0.5/0.618/0.786）
-//   ② 江恩bias（偏离20日均线百分比）
-//   ③ 缠论中枢边界（从ch引擎结果取，同时用K线验证）
-//   ④ 缠论bias（偏离中枢中轨百分比）
-//   ⑤ MACD背驰检测（顶背离/底背离，强度0-1）
-// 评级逻辑：
-//   S = 超强信号（背驰+方向共振）
-//   A = 价格共振+方向共振
-//   B = 单一共振（价格或方向）
-//   C = 仅有背驰
-//   N/A = 数据不足
-// ════════════════════════════════════════════════════════════════════════════
 
-// ── 辅助：从K线提取收盘/高/低价序列 ──────────────────────────────────────
 function _klineCloses(klines) { return klines.map(k => parseFloat(k[4] !== undefined ? k[4] : k.c)); }
 function _klineHighs(klines)  { return klines.map(k => parseFloat(k[2] !== undefined ? k[2] : k.h)); }
 function _klineLows(klines)   { return klines.map(k => parseFloat(k[3] !== undefined ? k[3] : k.l)); }
 
-// ── 辅助：EMA计算 ──────────────────────────────────────────────────────────
 function _calcEMA(values, period) {
   if (!values || values.length < period) return [];
   const k = 2 / (period + 1);
@@ -2433,7 +2146,6 @@ function _calcEMA(values, period) {
   return result;
 }
 
-// ── 辅助：MA计算 ───────────────────────────────────────────────────────────
 function _calcMA(values, period) {
   if (!values || values.length < period) return [];
   const result = new Array(period - 1).fill(null);
@@ -2444,7 +2156,6 @@ function _calcMA(values, period) {
   return result;
 }
 
-// ── ① MACD计算（标准EMA12/26/9）──────────────────────────────────────────
 function _calculateMACD(klines) {
   const closes = _klineCloses(klines);
   if (closes.length < 35) return null;
@@ -2456,16 +2167,12 @@ function _calculateMACD(klines) {
   const validDif = dif.filter(v => v !== null);
   const dea = _calcEMA(validDif, 9);
 
-  // 重建完整DEA（前面填null）
   const deaFull = new Array(dif.length - dea.length).fill(null).concat(dea);
   const macd = dif.map((v, i) => (v !== null && deaFull[i] !== null) ? (v - deaFull[i]) * 2 : null);
 
   return { dif, dea: deaFull, macd, closes };
 }
 
-// ── ② 背驰检测 ────────────────────────────────────────────────────────────
-// 顶背离：价格创新高，但MACD(DIF)没创新高 → 看跌信号
-// 底背离：价格创新低，但MACD(DIF)没创新低 → 看涨信号
 function _detectDivergence(klines) {
   const macdData = _calculateMACD(klines);
   if (!macdData) return { hasDivergence: false, type: null, strength: 0, detail: '数据不足' };
@@ -2474,7 +2181,6 @@ function _detectDivergence(klines) {
   const highs = _klineHighs(klines);
   const lows  = _klineLows(klines);
 
-  // 只看最近40根K线
   const N = Math.min(40, klines.length);
   const recentDif    = dif.slice(-N).filter(v => v !== null);
   const recentCloses = closes.slice(-N);
@@ -2483,7 +2189,6 @@ function _detectDivergence(klines) {
 
   if (recentDif.length < 10) return { hasDivergence: false, type: null, strength: 0, detail: '近期数据不足' };
 
-  // 找近期局部高点（前后各3根K线）
   const WIN = 3;
   const priceHighs = [], priceLows = [];
   for (let i = WIN; i < recentHighs.length - WIN; i++) {
@@ -2496,20 +2201,17 @@ function _detectDivergence(klines) {
     if (isL) priceLows.push({  idx: i, price: recentLows[i],  dif: recentDif[i] || 0 });
   }
 
-  // 顶背离：最近两个高点，价格更高但DIF更低
   let bearDivStrength = 0;
   if (priceHighs.length >= 2) {
     const h1 = priceHighs[priceHighs.length - 2];
     const h2 = priceHighs[priceHighs.length - 1];
     if (h2.price > h1.price && h2.dif < h1.dif) {
-      // 强度 = DIF下降幅度 相对于 DIF绝对值
       const difDrop = Math.abs(h2.dif - h1.dif);
       const difBase = Math.max(Math.abs(h1.dif), 0.0001);
       bearDivStrength = Math.min(1, difDrop / difBase * 0.8);
     }
   }
 
-  // 底背离：最近两个低点，价格更低但DIF更高
   let bullDivStrength = 0;
   if (priceLows.length >= 2) {
     const l1 = priceLows[priceLows.length - 2];
@@ -2532,9 +2234,7 @@ function _detectDivergence(klines) {
   return { hasDivergence: false, type: null, strength: 0, detail: '未发现明确背驰' };
 }
 
-// ── 主函数：engineGannChanSynergy ─────────────────────────────────────────
 function engineGannChanSynergy(gn, ch, price, klines) {
-  // ── 数据不足处理 ──────────────────────────────────────────────────────
   const N_MIN = 60;
   if (!klines || klines.length < N_MIN) {
     return {
@@ -2542,7 +2242,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
       details: { priceResonance: { exists: false }, directionResonance: { exists: false },
                  divergence: { exists: false, type: null, strength: 0 }, superSignal: false },
       message: `K线数据不足（需≥${N_MIN}根，当前${klines ? klines.length : 0}根），无法进行协同分析`,
-      // Legacy fields for panel rendering compatibility
       signals: [], priceResonances: [], overallScore: 0, grade: 'C',
       gradeLabel: '数据不足', synergyDir: 'neutral', hasSynergy: false, strongSignal: false,
     };
@@ -2551,7 +2250,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
   const P = price || (gn && gn.P) || parseFloat(klines[klines.length-1][4] || klines[klines.length-1].c || 0);
   if (!P) return null;
 
-  // ── ① 江恩关键位（真实高低价）─────────────────────────────────────────
   const recent60 = klines.slice(-60);
   const highs60  = _klineHighs(recent60);
   const lows60   = _klineLows(recent60);
@@ -2573,22 +2271,18 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     ratio: r.ratio,
   }));
 
-  // 加入江恩引擎已计算的阻力/支撑位
   if (gn && gn.res) gn.res.slice(0, 4).forEach(r => gannLevels.push({ price: r.price, label: r.source || '江恩阻力' }));
   if (gn && gn.sup) gn.sup.slice(0, 4).forEach(s => gannLevels.push({ price: s.price, label: s.source || '江恩支撑' }));
 
-  // ── ② 江恩bias（偏离20日均线）───────────────────────────────────────────
   const closes = _klineCloses(klines);
   const MA20arr = _calcMA(closes, 20);
   const ma20 = MA20arr[MA20arr.length - 1];
   const gannBias = ma20 ? ((P - ma20) / ma20 * 100) : 0;
 
-  // ── ③ 缠论中枢边界（优先用ch引擎结果，辅以K线验证）──────────────────────
   let chanZoneTop = ch && ch.zsHigh ? ch.zsHigh : null;
   let chanZoneBot = ch && ch.zsLow  ? ch.zsLow  : null;
   let chanZoneMid = (chanZoneTop && chanZoneBot) ? (chanZoneTop + chanZoneBot) / 2 : null;
 
-  // 若ch中枢无效，用最近20根K线的区间中值作为近似中枢
   if (!chanZoneTop || !chanZoneBot) {
     const recent20H = Math.max(..._klineHighs(klines.slice(-20)));
     const recent20L = Math.min(..._klineLows(klines.slice(-20)));
@@ -2597,30 +2291,22 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     chanZoneMid = (recent20H + recent20L) / 2;
   }
 
-  // 缠论中枢边界列表（供价格共振匹配）
   const chanLevels = [
     { price: chanZoneTop, label: '缠论中枢上轨' },
     { price: chanZoneBot, label: '缠论中枢下轨' },
     { price: chanZoneMid, label: '缠论中枢中轨' },
   ];
-  // 加入末笔端点
   if (ch && ch.pens && ch.pens.length) {
     const lp = ch.pens[ch.pens.length - 1];
     if (lp.endPrice)   chanLevels.push({ price: lp.endPrice,   label: '缠论末笔端点' });
     if (lp.startPrice) chanLevels.push({ price: lp.startPrice, label: '缠论末笔起点' });
   }
 
-  // ── ④ 缠论bias（偏离中枢中轨）──────────────────────────────────────────
   const chanBias = chanZoneMid ? ((P - chanZoneMid) / chanZoneMid * 100) : 0;
 
-  // ── ⑤ MACD背驰检测（真实K线）───────────────────────────────────────────
   const divergence = _detectDivergence(klines);
 
-  // ══════════════════════════════════════════════════════════════
-  // 判断逻辑
-  // ══════════════════════════════════════════════════════════════
 
-  // 价格共振：江恩关键位 与 缠论中枢边界 差距<2%
   const priceResonances = [];
   gannLevels.forEach(gl => {
     if (!gl.price || isNaN(gl.price)) return;
@@ -2643,17 +2329,14 @@ function engineGannChanSynergy(gn, ch, price, klines) {
   const priceRes = priceResonances[0] || null;
   const hasPriceResonance = priceResonances.length > 0;
 
-  // 方向共振：江恩bias与缠论bias同号（同正=多，同负=空）
   const hasDirectionResonance = (gannBias * chanBias) > 0;
   const dirBull = gannBias > 0 && chanBias > 0;
 
-  // 超强信号：背驰 + 方向共振
   const divergenceBull = divergence.type === 'bullish';
   const divergenceBear = divergence.type === 'bearish';
   const superSignal = divergence.hasDivergence && hasDirectionResonance
     && ((divergenceBull && dirBull) || (divergenceBear && !dirBull));
 
-  // ── 评级 ──────────────────────────────────────────────────────────────
   let rating, gradeLabel;
   if (superSignal) {
     rating = 'S'; gradeLabel = '超强共振';
@@ -2667,7 +2350,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     rating = 'C'; gradeLabel = '暂无共振信号';
   }
 
-  // ── 生成信号列表（供UI渲染）──────────────────────────────────────────
   const signals = [];
 
   if (superSignal) {
@@ -2707,7 +2389,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     });
   }
 
-  // 中枢突破信号
   if (ch && ch.zsValid && chanZoneTop && chanZoneBot) {
     const aboveZS = P > chanZoneTop;
     const belowZS = P < chanZoneBot;
@@ -2720,7 +2401,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     }
   }
 
-  // ── 综合评分（供进度条显示）──────────────────────────────────────────
   const scoreMap = { S: 0.92, A: 0.75, B: 0.55, C: 0.30 };
   const overallScore = scoreMap[rating] || 0.3;
   const synergyDir = superSignal
@@ -2729,7 +2409,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
       ? (dirBull ? 'bull' : 'bear')
       : 'neutral';
 
-  // ── UTC+8 时间标注 ──────────────────────────────────────────────────
   const analysisTime = typeof toUTC8Str === 'function' ? toUTC8Str(new Date()) : new Date().toLocaleString('zh-CN');
 
   const message = signals.length > 0
@@ -2737,7 +2416,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     : `江恩bias ${gannBias.toFixed(1)}%，缠论bias ${chanBias.toFixed(1)}%，暂无明确共振信号`;
 
   return {
-    // 新版结构化输出
     hasResonance: signals.length > 0,
     rating,
     details: {
@@ -2764,7 +2442,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     },
     message,
     analysisTime,
-    // Legacy UI compatibility fields
     signals,
     priceResonances: priceResonances.slice(0, 4),
     overallScore,
@@ -2773,7 +2450,6 @@ function engineGannChanSynergy(gn, ch, price, klines) {
     synergyDir,
     hasSynergy: signals.length > 0,
     strongSignal: rating === 'S' || rating === 'A',
-    // Debug data
     _debug: {
       klinesCount: klines.length,
       rangeHigh: parseFloat(rangeHigh.toFixed(2)),
@@ -2787,18 +2463,7 @@ function engineGannChanSynergy(gn, ch, price, klines) {
   };
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// SignalEnhancer 模块 v1.0
-// 包含三大子系统：
-//   ① ZhongshuValidator  — 缠论中枢稳定性验证（成交量+时间+价格三重校验）
-//   ② GannDynamicEngine  — 江恩角度线动态计算（时间价格双维度）
-//   ③ SignalBacktester   — 信号历史胜率统计（轻量级本地回测）
-// 整合为 SignalEnhancer 主类，输出增强信号+可视化建议
-// 性能：全程 klines.slice(-N) 避免全量扫描，缓存复用中间结果
-// 时间：所有输出统一 UTC+8（Asia/Shanghai）
-// ══════════════════════════════════════════════════════════════════════════════
 
-// ── UTC+8 辅助（与全局工具对齐）─────────────────────────────────────────────
 function _utc8Now() {
   return typeof getNowUTC8 === 'function' ? getNowUTC8() : new Date();
 }
@@ -2811,7 +2476,6 @@ function _utc8TimeStr(h1, h2) {
   return `${String(h1).padStart(2,'0')}:00–${String(h2).padStart(2,'0')}:00 (UTC+8)`;
 }
 
-// ── 共用：K线字段兼容（Binance数组 或 {o,h,l,c,v} 对象）──────────────────
 function _o(k)  { return parseFloat(k[1]  !== undefined ? k[1]  : k.o); }
 function _h(k)  { return parseFloat(k[2]  !== undefined ? k[2]  : k.h); }
 function _l(k)  { return parseFloat(k[3]  !== undefined ? k[3]  : k.l); }
@@ -2819,7 +2483,6 @@ function _c(k)  { return parseFloat(k[4]  !== undefined ? k[4]  : k.c); }
 function _v(k)  { return parseFloat(k[5]  !== undefined ? k[5]  : k.v || 0); }
 function _ts(k) { return parseInt (k[0]   !== undefined ? k[0]  : k.t || k.ms || 0); }
 
-// ── 共用：简单统计工具 ────────────────────────────────────────────────────
 function _mean(arr)   { return arr.length ? arr.reduce((s,v) => s+v, 0) / arr.length : 0; }
 function _std(arr)    {
   if (arr.length < 2) return 0;
@@ -2828,17 +2491,13 @@ function _std(arr)    {
 }
 function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ① ZhongshuValidator — 缠论中枢稳定性验证
-// ══════════════════════════════════════════════════════════════════════════════
 class ZhongshuValidator {
-  static cache = new Map();  // key: `${top}_${bottom}_${klines.length}`
+  static cache = new Map();
 
   constructor(klines) {
     this.klines = klines || [];
   }
 
-  // ── 清理过期缓存（保留最近50条）──────────────────────────────────────────
   static _trimCache() {
     if (ZhongshuValidator.cache.size > 50) {
       const keys = [...ZhongshuValidator.cache.keys()].slice(0, 20);
@@ -2846,7 +2505,6 @@ class ZhongshuValidator {
     }
   }
 
-  // ── 主验证入口 ─────────────────────────────────────────────────────────
   validate(zhongshu) {
     if (!zhongshu || zhongshu.top == null || zhongshu.bottom == null) {
       return { isValid: false, confidence: 0, reasons: ['中枢数据缺失'] };
@@ -2860,12 +2518,10 @@ class ZhongshuValidator {
     const reasons  = [];
     const scores   = [];
 
-    // ── 三重校验 ────────────────────────────────────────────────────────
     const volCheck   = this.checkVolume(zhongshu);
     const timeCheck  = this.checkTime(zhongshu);
     const priceCheck = this.checkPrice(zhongshu);
 
-    // 成交量校验（权重 0.35）
     if (volCheck.pass) {
       scores.push(0.35 * volCheck.score);
       reasons.push(`✓ 成交量：中枢内缩量比 ${(volCheck.ratio * 100).toFixed(0)}%（有效）`);
@@ -2874,7 +2530,6 @@ class ZhongshuValidator {
       reasons.push(`△ 成交量：缩量不明显（比率 ${(volCheck.ratio * 100).toFixed(0)}%）`);
     }
 
-    // 时间校验（权重 0.30）
     if (timeCheck.pass) {
       scores.push(0.30 * timeCheck.score);
       reasons.push(`✓ 时间结构：${timeCheck.barCount}根K线形成（≥最低${timeCheck.minRequired}根）`);
@@ -2883,7 +2538,6 @@ class ZhongshuValidator {
       reasons.push(`✗ 时间结构不足：仅${timeCheck.barCount}根（需≥${timeCheck.minRequired}根）`);
     }
 
-    // 价格校验（权重 0.35）
     if (priceCheck.pass) {
       scores.push(0.35 * priceCheck.score);
       reasons.push(`✓ 价格边界：上下沿清晰度 ${(priceCheck.clarity * 100).toFixed(0)}%`);
@@ -2907,9 +2561,6 @@ class ZhongshuValidator {
     return result;
   }
 
-  // ── ① 成交量校验：中枢内应缩量 ────────────────────────────────────────
-  // 原理：价格震荡整理时，多空分歧减少 → 成交量萎缩
-  // 判断：中枢区间内平均成交量 < 前后区间平均成交量 × 0.8
   checkVolume(zhongshu) {
     const klines = this.klines;
     if (klines.length < 20) {
@@ -2919,7 +2570,6 @@ class ZhongshuValidator {
     const top    = zhongshu.top;
     const bottom = zhongshu.bottom;
 
-    // 找出"在中枢区间内"的K线（close在top/bottom之间）
     const inZS  = klines.filter(k => { const c = _c(k); return c >= bottom && c <= top; });
     const outZS = klines.filter(k => { const c = _c(k); return c < bottom || c > top; });
 
@@ -2932,9 +2582,8 @@ class ZhongshuValidator {
 
     if (volOut === 0) return { pass: false, score: 0.3, ratio: 1, reason: '成交量数据异常' };
 
-    const ratio = volIn / volOut;  // <1 表示缩量
+    const ratio = volIn / volOut;
     const pass  = ratio < 0.85;
-    // 得分：ratio越小越好，0.3~1.0线性映射
     const score = _clamp(1 - (ratio - 0.3) / 0.7, 0.1, 1.0);
 
     return {
@@ -2946,9 +2595,6 @@ class ZhongshuValidator {
     };
   }
 
-  // ── ② 时间校验：中枢至少需要3笔 ────────────────────────────────────────
-  // 3笔 = 上升笔+下降笔+上升笔（或反向），在时间上至少需要 minRequired 根K线
-  // 规则：K线周期越大，所需根数越少（日线3根 vs 1h线24根）
   checkTime(zhongshu) {
     const klines = this.klines;
     const top    = zhongshu.top;
@@ -2957,18 +2603,15 @@ class ZhongshuValidator {
       return { pass: false, score: 0, barCount: 0, minRequired: 9, reason: '数据不足' };
     }
 
-    // 估算K线周期（用相邻时间戳差值）
-    let msPerBar = 14400000; // 默认4H
+    let msPerBar = 14400000;
     if (klines.length >= 2) {
       const t1 = _ts(klines[klines.length - 1]);
       const t2 = _ts(klines[klines.length - 2]);
       if (t1 > t2) msPerBar = t1 - t2;
     }
     const hoursPerBar = msPerBar / 3600000;
-    // 最低根数：每笔至少3根K线，3笔=9根；日线放宽到5根
     const minRequired = hoursPerBar >= 24 ? 5 : hoursPerBar >= 4 ? 9 : 18;
 
-    // 统计价格在中枢区间内经历的K线数
     let barCount = 0, inBlock = false;
     for (const k of klines) {
       const c = _c(k);
@@ -2976,7 +2619,6 @@ class ZhongshuValidator {
         barCount++;
         inBlock = true;
       } else if (inBlock) {
-        // 允许短暂突破后回归（不超过3根）
       }
     }
 
@@ -2992,9 +2634,6 @@ class ZhongshuValidator {
     };
   }
 
-  // ── ③ 价格校验：上下沿清晰度 ────────────────────────────────────────────
-  // 清晰度 = 价格有效触及上下沿的次数 / 理论需要次数
-  // 有效触及：K线high触及top ±0.5% 或 low触及bottom ±0.5%
   checkPrice(zhongshu) {
     const klines = this.klines;
     const top    = zhongshu.top;
@@ -3003,23 +2642,19 @@ class ZhongshuValidator {
       return { pass: false, score: 0, clarity: 0, reason: '价格数据缺失' };
     }
 
-    const tol = 0.005; // 0.5% 容忍误差
+    const tol = 0.005;
     let topTouches = 0, botTouches = 0;
     let topBreaks = 0, botBreaks = 0;
 
     for (const k of klines) {
       const h = _h(k), l = _l(k), c = _c(k);
-      // 触及
       if (h >= top * (1 - tol) && h <= top * (1 + tol * 3))  topTouches++;
       if (l <= bottom * (1 + tol) && l >= bottom * (1 - tol * 3)) botTouches++;
-      // 有效突破（收盘价突破）
       if (c > top * (1 + tol))    topBreaks++;
       if (c < bottom * (1 - tol)) botBreaks++;
     }
 
-    // 有效中枢：上下沿各至少被触及1次
     const touchScore  = _clamp((Math.min(topTouches, 3) + Math.min(botTouches, 3)) / 6, 0, 1);
-    // 突破后能回归中枢加分（说明边界有支撑/阻力），过多突破不确认则减分
     const breakPenalty = Math.max(0, topBreaks + botBreaks - 4) * 0.05;
     const clarity = _clamp(touchScore - breakPenalty, 0, 1);
     const pass    = clarity >= 0.3 && topTouches >= 1 && botTouches >= 1;
@@ -3036,18 +2671,12 @@ class ZhongshuValidator {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ② GannDynamicEngine — 江恩角度线动态计算
-// ══════════════════════════════════════════════════════════════════════════════
 class GannDynamicEngine {
   constructor(klines) {
     this.klines = klines || [];
     this._cache = {};
   }
 
-  // ── 计算江恩箱（Gann Box）────────────────────────────────────────────────
-  // 核心：将价格幅度与时间幅度统一为同一比例
-  // 公式：1×1线斜率 = 价格范围 / 时间范围（单位：美元/根K线）
   calculateGannBox(n = 60) {
     const k = this.klines.slice(-n);
     if (k.length < 10) return null;
@@ -3057,12 +2686,10 @@ class GannDynamicEngine {
     const rangeH  = Math.max(...highs);
     const rangeL  = Math.min(...lows);
     const priceRange = rangeH - rangeL;
-    const timeRange  = k.length;  // 根数
+    const timeRange  = k.length;
 
-    // 1×1角度：每根K线价格变动 = priceRange / timeRange
     const unitPrice = priceRange / timeRange;
 
-    // ATR用于波动率感知
     const atr = this._calcATR(k, 14);
     const volatilityFactor = atr > 0 ? atr / (priceRange / timeRange) : 1;
 
@@ -3072,18 +2699,16 @@ class GannDynamicEngine {
       priceRange: parseFloat(priceRange.toFixed(2)),
       timeRange,
       unitPrice: parseFloat(unitPrice.toFixed(4)),
-      // 三条基础角度线斜率（单位：$每根K线）
-      angle1x1: parseFloat(unitPrice.toFixed(4)),        // 45° 均衡线
-      angle2x1: parseFloat((unitPrice * 2).toFixed(4)),  // 陡峭（强趋势）
-      angle1x2: parseFloat((unitPrice * 0.5).toFixed(4)),// 平缓（弱趋势）
-      angle3x1: parseFloat((unitPrice * 3).toFixed(4)),  // 极强趋势
-      angle1x3: parseFloat((unitPrice / 3).toFixed(4)),  // 极弱趋势
+      angle1x1: parseFloat(unitPrice.toFixed(4)),
+      angle2x1: parseFloat((unitPrice * 2).toFixed(4)),
+      angle1x2: parseFloat((unitPrice * 0.5).toFixed(4)),
+      angle3x1: parseFloat((unitPrice * 3).toFixed(4)),
+      angle1x3: parseFloat((unitPrice / 3).toFixed(4)),
       atr: parseFloat(atr.toFixed(2)),
       volatilityFactor: parseFloat(volatilityFactor.toFixed(3)),
     };
   }
 
-  // ── ATR计算（真实波幅均值）───────────────────────────────────────────────
   _calcATR(klines, period = 14) {
     if (klines.length < period + 1) return _mean(klines.map(k => _h(k) - _l(k)));
     const trs = [];
@@ -3094,44 +2719,36 @@ class GannDynamicEngine {
     return _mean(trs.slice(-period));
   }
 
-  // ── 动态调整角度（波动率自适应）──────────────────────────────────────────
-  // 波动率大时角度变陡 → 用 volatilityFactor 缩放 unitPrice
   getDynamicAngles() {
     const box = this.calculateGannBox();
     if (!box) return null;
 
-    // 波动率因子修正：ATR / (priceRange/timeRange) 反映当前 vs 历史波动比
     const vf  = _clamp(box.volatilityFactor, 0.5, 3.0);
-    const adj = box.unitPrice * vf;  // 动态调整后的单位价格
+    const adj = box.unitPrice * vf;
 
-    // 当前价（最后收盘）
     const curPrice = _c(this.klines[this.klines.length - 1]);
 
     return {
       baseAngle: parseFloat(adj.toFixed(4)),
       volatilityFactor: parseFloat(vf.toFixed(3)),
-      // 上行角度线（从最低点出发）
       up: {
         '1x1': { slope: adj,       label: '1×1上行（均衡）',   color: '#d4a843' },
         '2x1': { slope: adj * 2,   label: '2×1上行（强势）',   color: '#28c870' },
         '3x1': { slope: adj * 3,   label: '3×1上行（极强）',   color: '#38a8e0' },
         '1x2': { slope: adj * 0.5, label: '1×2上行（弱势）',   color: '#888888' },
       },
-      // 下行角度线（从最高点出发，斜率为负）
       down: {
         '1x1': { slope: -adj,       label: '1×1下行（均衡）',   color: '#e04848' },
         '2x1': { slope: -adj * 2,   label: '2×1下行（强压）',   color: '#e08030' },
         '1x2': { slope: -adj * 0.5, label: '1×2下行（弱压）',   color: '#c0c0c0' },
       },
-      // 当前价格处于哪个角度通道
       currentChannel: this._identifyChannel(curPrice, box, adj),
     };
   }
 
-  // ── 识别当前价格所在角度通道 ─────────────────────────────────────────────
   _identifyChannel(price, box, adj) {
     const mid = (box.rangeH + box.rangeL) / 2;
-    const pos = (price - box.rangeL) / box.priceRange;  // 0=低点,1=高点
+    const pos = (price - box.rangeL) / box.priceRange;
 
     if (pos > 0.786) return { label: '3×1强势区（顶部风险）', strength: 'overbought', color: '#e04848' };
     if (pos > 0.618) return { label: '2×1上行通道（强势）',   strength: 'strong_up',  color: '#28c870' };
@@ -3141,9 +2758,6 @@ class GannDynamicEngine {
     return            { label: '3×1强势空区（底部机会）',     strength: 'oversold',   color: '#38a8e0' };
   }
 
-  // ── 关键位+时间窗口（带时间因子）─────────────────────────────────────────
-  // 核心：将江恩角度线投影到未来K线，得到"预计在第X根K线触及价格P"
-  // 时间映射：每格角度线 = msPerBar毫秒，映射到 UTC+8 时间
   getKeyLevelsWithTime() {
     const box    = this.calculateGannBox();
     const angles = this.getDynamicAngles();
@@ -3152,7 +2766,6 @@ class GannDynamicEngine {
     const klines = this.klines;
     if (klines.length < 5) return [];
 
-    // 估算K线周期
     const lastTs   = _ts(klines[klines.length - 1]);
     const prevTs   = _ts(klines[klines.length - 2]);
     const msPerBar = lastTs > prevTs ? lastTs - prevTs : 14400000;
@@ -3161,7 +2774,6 @@ class GannDynamicEngine {
     const curPrice = _c(klines[klines.length - 1]);
     const results  = [];
 
-    // 从高/低点分别延伸几条角度线，计算它们在未来1~8根K线的价位
     const pivots = [
       { price: box.rangeL, label: '最低点', dir: 'up' },
       { price: box.rangeH, label: '最高点', dir: 'dn' },
@@ -3177,10 +2789,8 @@ class GannDynamicEngine {
     pivots.forEach(pivot => {
       const slopes = angleSlopes[pivot.dir] || [];
       slopes.forEach((slope, si) => {
-        // 计算这条线与当前价格相交的时间（反解barOffset）
         const barOffset = slope > 0 ? (curPrice - pivot.price) / slope : 0;
 
-        // 向前延伸1~6根K线
         for (let b = 1; b <= 6; b++) {
           const futurePrice = pivot.dir === 'up'
             ? pivot.price + slope * (barOffset + b)
@@ -3188,7 +2798,6 @@ class GannDynamicEngine {
 
           if (futurePrice <= 0) continue;
 
-          // 时间窗口：第b根K线的起止时间
           const startMs = lastTs + (b - 1) * msPerBar;
           const endMs   = lastTs + b * msPerBar;
           const startD  = new Date(startMs);
@@ -3196,7 +2805,6 @@ class GannDynamicEngine {
           const startH  = parseInt(_utc8Str(startD).slice(11, 13)) || 0;
           const endH    = (startH + Math.ceil(hPerBar)) % 24;
 
-          // 只保留价格在当前价 ±15% 范围内的预测
           const diffPct = Math.abs(futurePrice - curPrice) / curPrice * 100;
           if (diffPct > 15) continue;
 
@@ -3218,7 +2826,6 @@ class GannDynamicEngine {
       });
     });
 
-    // 去重（价格相差<0.3%视为同位），按距当前价格排序
     const deduped = [];
     results.sort((a,b) => a.diffPct - b.diffPct).forEach(r => {
       if (!deduped.some(d => Math.abs(d.price - r.price) / (curPrice||1) < 0.003)) {
@@ -3229,7 +2836,6 @@ class GannDynamicEngine {
     return deduped.slice(0, 8);
   }
 
-  // ── 角度线可视化数据（返回SVG/Canvas所需的点集）────────────────────────
   getAngleLines(canvasW = 400, canvasH = 200, futureN = 10) {
     const box    = this.calculateGannBox();
     const angles = this.getDynamicAngles();
@@ -3248,7 +2854,6 @@ class GannDynamicEngine {
 
     const lines = [];
 
-    // 从最低点出发的上行角度线
     const lowIdx  = allL.indexOf(Math.min(...allL));
     const lowPrice = allL[lowIdx];
     [angles.up['1x1'], angles.up['2x1'], angles.up['1x2']].forEach(ang => {
@@ -3261,13 +2866,12 @@ class GannDynamicEngine {
       if (pts.length >= 2) lines.push({ label: ang.label, color: ang.color, points: pts, dash: false });
     });
 
-    // 从最高点出发的下行角度线
     const highIdx  = allH.indexOf(Math.max(...allH));
     const highPrice = allH[highIdx];
     [angles.down['1x1'], angles.down['2x1']].forEach(ang => {
       const pts = [];
       for (let b = 0; b <= futureN + (n - highIdx); b++) {
-        const price = highPrice + ang.slope * b; // slope是负数
+        const price = highPrice + ang.slope * b;
         if (price < minP * 0.95 || price > maxP * 1.02) continue;
         pts.push({ x: parseFloat(toX(highIdx + b).toFixed(1)), y: parseFloat(toY(price).toFixed(1)) });
       }
@@ -3284,18 +2888,12 @@ class GannDynamicEngine {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// ③ SignalBacktester — 信号历史胜率统计
-// ══════════════════════════════════════════════════════════════════════════════
 class SignalBacktester {
   constructor(klines) {
     this.klines = klines || [];
     this._cache = {};
   }
 
-  // ── 回测历史信号 ─────────────────────────────────────────────────────────
-  // 思路：在K线中重新运行轻量级信号检测，统计每次信号后N根K线的涨跌幅
-  // signalType: 'macd_divergence_bull' | 'macd_divergence_bear' | 'zhongshu_break' | 'direction_resonance'
   backtest(signalType, holdBars = 12) {
     const cacheKey = `${signalType}_${holdBars}_${this.klines.length}`;
     if (this._cache[cacheKey]) return this._cache[cacheKey];
@@ -3311,9 +2909,8 @@ class SignalBacktester {
     if (!signalFn) return { totalSignals:0, winRate:'N/A', note:'未知信号类型' };
 
     const returns = [];
-    const WIN  = 5; // 局部极值窗口
+    const WIN  = 5;
 
-    // 滑动窗口扫描：每次用前N根K线检测信号，然后看后holdBars根的表现
     const SCAN_WIN = 60;
     for (let i = SCAN_WIN; i < klines.length - holdBars; i++) {
       const slice = klines.slice(i - SCAN_WIN, i);
@@ -3334,7 +2931,6 @@ class SignalBacktester {
       return result;
     }
 
-    // 统计（多空信号方向相反）
     const isBull = signalType.includes('bull') || signalType.includes('resonance');
     const adjustedReturns = isBull ? returns : returns.map(r => -r);
 
@@ -3363,10 +2959,8 @@ class SignalBacktester {
     return result;
   }
 
-  // ── 信号检测器工厂 ───────────────────────────────────────────────────────
   _getSignalDetector(type) {
     const detectors = {
-      // MACD底背离检测（取最后20根）
       'macd_divergence_bull': (klines) => {
         if (klines.length < 35) return false;
         const closes = klines.map(_c);
@@ -3375,14 +2969,12 @@ class SignalBacktester {
         if (!dif || dif.length < 10) return false;
         const recentL   = lows.slice(-20);
         const recentDIF = dif.slice(-20);
-        // 最后一根低点 < 倒数10根内的低点，但DIF更高
         const minL10   = Math.min(...recentL.slice(-10));
         const minL20   = Math.min(...recentL.slice(0, 10));
         const difEnd   = recentDIF[recentDIF.length - 1];
         const difMid   = _mean(recentDIF.slice(0, 10).filter(v => v != null));
         return minL10 < minL20 * 0.998 && difEnd > difMid * 1.05;
       },
-      // MACD顶背离
       'macd_divergence_bear': (klines) => {
         if (klines.length < 35) return false;
         const closes = klines.map(_c);
@@ -3397,33 +2989,28 @@ class SignalBacktester {
         const difMid  = _mean(recentDIF.slice(0, 10).filter(v => v != null));
         return maxH10 > maxH20 * 1.002 && difEnd < difMid * 0.95;
       },
-      // 方向共振（江恩+缠论bias同号）
       'direction_resonance': (klines) => {
         if (klines.length < 25) return false;
         const closes = klines.map(_c);
         const ma20   = _mean(closes.slice(-20));
         const last   = closes[closes.length - 1];
         const bias   = (last - ma20) / ma20 * 100;
-        // 简化：价格偏离MA20超过±1%时认为有方向共振信号
         return Math.abs(bias) > 1;
       },
-      // 中枢突破
       'zhongshu_break': (klines) => {
         if (klines.length < 20) return false;
         const closes = klines.map(_c);
         const high   = Math.max(...klines.slice(-20).map(_h));
         const low    = Math.min(...klines.slice(-20).map(_l));
         const mid    = (high + low) / 2;
-        const range  = (high - low) * 0.382; // 近似中枢区间
+        const range  = (high - low) * 0.382;
         const last   = closes[closes.length - 1];
-        // 最后价格突破了中枢范围
         return last > mid + range || last < mid - range;
       },
     };
     return detectors[type] || null;
   }
 
-  // ── 快速DIF计算（12/26 EMA差）───────────────────────────────────────────
   _quickDIF(closes) {
     if (closes.length < 26) return null;
     const k12 = 2 / 13, k26 = 2 / 27;
@@ -3438,7 +3025,6 @@ class SignalBacktester {
     return dif;
   }
 
-  // ── 实时信号置信度 ───────────────────────────────────────────────────────
   getConfidence(currentSignal) {
     if (!currentSignal) return { confidence: 50, rating: 'C', similarHistory: 0, similarWinRate: 'N/A' };
 
@@ -3447,9 +3033,9 @@ class SignalBacktester {
 
     const winRateNum = parseFloat(bt.winRate) || 50;
     const conf = _clamp(
-      winRateNum * 0.6 +               // 历史胜率权重60%
-      Math.min(bt.totalSignals, 20) / 20 * 100 * 0.2 + // 样本量权重20%
-      Math.min(bt.sharpeRatio * 20, 40) * 0.2,          // 夏普权重20%
+      winRateNum * 0.6 +
+      Math.min(bt.totalSignals, 20) / 20 * 100 * 0.2 +
+      Math.min(bt.sharpeRatio * 20, 40) * 0.2,
       0, 100
     );
 
@@ -3465,31 +3051,27 @@ class SignalBacktester {
     };
   }
 
-  // ── 信号类型映射 ─────────────────────────────────────────────────────────
   _mapSignalType(signal) {
     const type = (signal.type || signal.signalType || '').toLowerCase();
     if (type.includes('背驰') && (type.includes('底') || type.includes('bull'))) return 'macd_divergence_bull';
     if (type.includes('背驰') && (type.includes('顶') || type.includes('bear'))) return 'macd_divergence_bear';
     if (type.includes('方向') || type.includes('resonance'))                      return 'direction_resonance';
     if (type.includes('中枢') || type.includes('突破'))                           return 'zhongshu_break';
-    return 'direction_resonance';  // 默认
+    return 'direction_resonance';
   }
 
-  // ── 风险提示 ─────────────────────────────────────────────────────────────
   getRiskWarning(signal, currentPrice) {
     if (!signal || !currentPrice) return null;
     const atr = this._calcLocalATR();
     const isBull = signal.bull !== false;
-    // 止损：1.5倍ATR
     const slDist  = atr * 1.5;
-    const tpDist  = atr * 2.5;  // 目标：2.5倍ATR（RRR ≈ 1.67）
+    const tpDist  = atr * 2.5;
     const sl = isBull ? currentPrice - slDist : currentPrice + slDist;
     const tp = isBull ? currentPrice + tpDist : currentPrice - tpDist;
     const rrr = (tpDist / slDist).toFixed(2);
 
     const bt = this.backtest(this._mapSignalType(signal));
     const winRateNum = parseFloat(bt.winRate) || 50;
-    // Kelly公式：f* = (bp - q) / b，b = RRR，p=胜率，q=1-p
     const b = parseFloat(rrr);
     const p = winRateNum / 100;
     const q = 1 - p;
@@ -3510,7 +3092,6 @@ class SignalBacktester {
     };
   }
 
-  // ── 本地ATR计算 ──────────────────────────────────────────────────────────
   _calcLocalATR(period = 14) {
     const k = this.klines.slice(-period - 1);
     if (k.length < 2) return 100;
@@ -3523,9 +3104,6 @@ class SignalBacktester {
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// 主类：SignalEnhancer
-// ══════════════════════════════════════════════════════════════════════════════
 class SignalEnhancer {
   constructor(klines) {
     if (!klines || klines.length === 0) {
@@ -3538,14 +3116,12 @@ class SignalEnhancer {
     this._enhanceCache     = new Map();
   }
 
-  // ── 主方法：增强原始信号 ──────────────────────────────────────────────────
   enhanceSignal(rawSignal) {
     if (!rawSignal) return null;
 
     const cacheKey = JSON.stringify({ type: rawSignal.type, rating: rawSignal.rating });
     if (this._enhanceCache.has(cacheKey)) return this._enhanceCache.get(cacheKey);
 
-    // ── 新功能 A: 黑天鹅检测（最先运行，触发则直接返回 X 级）──────────────
     const swanResult = this._detectBlackSwan();
     if (swanResult.isBlackSwan) {
       const result = {
@@ -3563,16 +3139,12 @@ class SignalEnhancer {
       return result;
     }
 
-    // 当前价格
     const curPrice = _c(this.klines[this.klines.length - 1]);
 
-    // ── 新功能 B: 成交额过滤（先于一切评级计算）──────────────────────────────
     const volFilter = this._checkVolumeFilter();
 
-    // ── 新功能 C: 假信号过滤器 ──────────────────────────────────────────────
     const fakeFilter = this._detectFakeSignal(rawSignal);
 
-    // ── 1. 中枢置信度验证 ──────────────────────────────────────────────────
     const zhongshu = rawSignal.zhongshu || rawSignal.chanZone || {
       top:    rawSignal.details?.priceResonance?.chanZone || curPrice * 1.05,
       bottom: curPrice * 0.95,
@@ -3580,44 +3152,32 @@ class SignalEnhancer {
     zhongshu.mid = zhongshu.mid || (zhongshu.top + zhongshu.bottom) / 2;
     const zhongshuConf = this.zhongshuValidator.validate(zhongshu);
 
-    // ── 2. GannDynamicEngine：完整整合 ────────────────────────────────────
-    // 2a. 计算江恩箱（价格通道参数，含ATR和波动率因子）
     const gannBox    = this.gannEngine.calculateGannBox();
 
-    // 2b. 动态角度线（波动率自适应，含当前通道识别）
     const gannAngles = this.gannEngine.getDynamicAngles();
 
-    // 2c. 带时间窗口的关键位（将角度线投影到未来K线，输出UTC+8时间）
     const gannLevels = this.gannEngine.getKeyLevelsWithTime();
 
-    // 2d. 角度线可视化数据（Canvas/SVG点集，供图表叠加）
     const angleViz   = this.gannEngine.getAngleLines();
 
-    // 2e. 信号方向过滤：做多信号保留支撑位，做空信号保留阻力位
     const isBullSignal = rawSignal.bull !== false
       && (rawSignal.synergyDir === 'bull' || (rawSignal.details?.directionResonance?.gannBias > 0));
     const filteredLevels = gannLevels.filter(l =>
-      isBullSignal ? !l.isAbove : l.isAbove   // 多信号取支撑，空信号取阻力
+      isBullSignal ? !l.isAbove : l.isAbove
     );
-    // 若过滤后为空则使用全部（无法判断方向时）
     const relevantLevels = filteredLevels.length > 0 ? filteredLevels : gannLevels;
 
-    // 2f. 最近的有效关键位（距离当前价 ≤ 5%）
     const nearestGann = relevantLevels.find(l => l.diffPct <= 5) || gannLevels[0] || null;
     const timeWindow  = nearestGann ? nearestGann.timeWindow : _utc8TimeStr(0, 4);
 
-    // 2g. 江恩位与中枢是否共振（价差 < 1.5%，提升置信度）
     const gannChanResonant = gannLevels.some(gl =>
       Math.abs(gl.price - zhongshu.top)    / (curPrice || 1) * 100 < 1.5 ||
       Math.abs(gl.price - zhongshu.bottom) / (curPrice || 1) * 100 < 1.5
     );
 
-    // ── 3. 历史胜率 ───────────────────────────────────────────────────────
     const histConf  = this.backtester.getConfidence(rawSignal);
     const riskWarn  = this.backtester.getRiskWarning(rawSignal, curPrice);
 
-    // ── 4. 综合置信度（四因子加权）────────────────────────────────────────
-    // 原始评级 30% + 历史胜率 30% + 中枢置信度 25% + 江恩共振加成 15%
     const ratingScore  = { S:100, A:80, B:60, C:40, 'N/A':30 };
     const baseScore    = ratingScore[rawSignal.rating || 'C'] || 40;
     const gannBonus    = gannChanResonant ? 100 : (nearestGann && nearestGann.diffPct <= 3 ? 70 : 40);
@@ -3628,39 +3188,30 @@ class SignalEnhancer {
       gannBonus            * 0.15
     );
 
-    // ── 5. 风险等级（综合置信度 + 江恩通道位置）───────────────────────────
     const channelStr = gannAngles?.currentChannel?.strength || 'ranging';
     const channelRisk = { overbought: 1, oversold: 0, strong_up: 0, strong_dn: 1,
                           slight_up: 0, slight_dn: 0 }[channelStr] ?? 0;
     const riskLevel = (finalConf >= 75 && !channelRisk && !volFilter.filtered && !fakeFilter.isFake) ? '低'
                     : finalConf >= 55 ? '中' : '高';
 
-    // ── 新功能 D: 多周期评级合并 ────────────────────────────────────────────
-    // 注意：此步依赖外部传入的 multiTFRatings（由调用方异步预置），若未传入则跳过
     const mtfRatings   = rawSignal._multiTFRatings || null;
     const mtfResult    = mtfRatings ? this._mergeMultiTFRatings(rawSignal.rating, mtfRatings) : null;
 
-    // ── 新功能 E: 自动资金管理引擎 ──────────────────────────────────────────
     const moneyMgmt = this._calcMoneyManagement(rawSignal, finalConf, riskWarn);
 
-    // ── 6. 可视化（含角度线点集 + 止损目标HTML）──────────────────────────
     const viz = this._buildVizSuggestion(
       rawSignal, riskWarn, relevantLevels, gannAngles, gannBox, angleViz, curPrice
     );
 
-    // ── 7. 组装增强信号（完整输出格式）──────────────────────────────────
     const enhanced = {
-      // 原始信号完整保留
       ...rawSignal,
 
-      // 核心增强字段
       confidence:      finalConf,
       confidenceLabel: finalConf >= 80 ? '高置信' : finalConf >= 60 ? '中置信' : '低置信',
       riskLevel,
-      timeWindow,          // 最近江恩关键位的UTC+8时间窗口
+      timeWindow,
       analysisTime:    _utc8Str(_utc8Now()),
 
-      // 中枢验证
       zhongshuValidation: {
         isValid:    zhongshuConf.isValid,
         confidence: zhongshuConf.confidence,
@@ -3670,10 +3221,9 @@ class SignalEnhancer {
         priceCheck: zhongshuConf.priceCheck || null,
       },
 
-      // 江恩动态引擎完整输出
       gannDynamic: {
-        keyLevels:       relevantLevels,           // 方向过滤后的关键位（带timeWindow）
-        allLevels:       gannLevels,               // 全部关键位（不过滤）
+        keyLevels:       relevantLevels,
+        allLevels:       gannLevels,
         channel:         gannAngles?.currentChannel || null,
         channelNote:     gannAngles?.currentChannel
                           ? `当前处于${gannAngles.currentChannel.label}` : null,
@@ -3686,18 +3236,16 @@ class SignalEnhancer {
           angle2x1:         gannBox.angle2x1,
         } : null,
         nearestLevel:    nearestGann,
-        gannChanResonant,                          // 江恩位与缠论中枢是否共振
-        angleLines:      angleViz?.lines  || [],   // Canvas画线数据
+        gannChanResonant,
+        angleLines:      angleViz?.lines  || [],
         canvasInfo:      angleViz ? {
           w: angleViz.canvasW, h: angleViz.canvasH,
           minP: angleViz.minP,  maxP: angleViz.maxP,
           currentBarIdx: angleViz.currentBarIdx,
         } : null,
-        // 角度简报（文字）
         summary: this._buildGannSummary(gannBox, gannAngles, nearestGann, isBullSignal),
       },
 
-      // 历史回测
       history: {
         confidence:   histConf.confidence,
         rating:       histConf.rating,
@@ -3707,23 +3255,19 @@ class SignalEnhancer {
         sharpeRatio:  histConf.sharpeRatio,
       },
 
-      // 止损/止盈（ATR驱动 → 资金管理引擎覆盖）
       suggestStopLoss:  riskWarn ? riskWarn.stopLoss      : null,
       suggestTarget:    riskWarn ? riskWarn.takeProfit     : null,
       suggestStopPct:   riskWarn ? riskWarn.stopLossPct    : null,
       suggestTargetPct: riskWarn ? riskWarn.takeProfitPct  : null,
       rrr:              riskWarn ? riskWarn.rrr             : null,
-      // 资金管理引擎覆盖仓位
       suggestPosition:  moneyMgmt.suggestPosition,
 
-      // 新功能输出
       volumeFilter:  volFilter,
       fakeFilter:    fakeFilter,
       blackSwan:     swanResult,
       multiTF:       mtfResult,
       moneyManagement: moneyMgmt,
 
-      // 可视化（注入新功能摘要卡）
       visualization: {
         ...viz,
         htmlSummary: viz.htmlSummary
@@ -3735,7 +3279,6 @@ class SignalEnhancer {
     return enhanced;
   }
 
-  // ── 江恩动态摘要（自然语言描述）──────────────────────────────────────────
   _buildGannSummary(box, angles, nearestLevel, isBull) {
     if (!box || !angles) return '江恩数据不足';
     const ch  = angles.currentChannel;
@@ -3744,33 +3287,26 @@ class SignalEnhancer {
     const fmtP = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n))return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():'$'+_n.toFixed(2); };
 
     let s = '';
-    // 通道状态
     if (ch) s += `当前处于「${ch.label}」`;
-    // 波动率状态
     s += vf > 1.5 ? '，波动率偏高（角度线变陡）'
        : vf < 0.7 ? '，波动率偏低（角度线平缓）'
        : '，波动率正常';
-    // 最近关键位
     if (nearestLevel) {
       s += `。最近关键位 ${fmtP(nearestLevel.price)}（${nearestLevel.isAbove ? '上方阻力' : '下方支撑'}）`
         + `，预计触及时间窗口 ${nearestLevel.timeWindow}`;
     }
-    // 方向建议
     s += isBull ? '。ATR=' + fmtP(atr) + '，关注支撑位企稳入场机会'
                 : '。ATR=' + fmtP(atr) + '，关注阻力位回落做空机会';
     return s;
   }
 
-  // ── 可视化建议（含角度线点集）────────────────────────────────────────────
   _buildVizSuggestion(signal, riskWarn, gannLevels, gannAngles, gannBox, angleViz, curPrice) {
     const fmtP = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n)||_n===0)return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():_n>=1?'$'+_n.toFixed(2):'$'+_n.toFixed(4); };
     const lines = [];
 
-    // 当前价格线
     lines.push({ type:'price', price:curPrice, color:'#d4a843',
       label:`当前价 ${fmtP(curPrice)}`, dash:false, width:2 });
 
-    // 止损/目标线
     if (riskWarn) {
       lines.push({ type:'sl', price:riskWarn.stopLoss, color:'#e04848',
         label:`⛔ 止损 ${fmtP(riskWarn.stopLoss)} (-${riskWarn.stopLossPct}%)`, dash:true, width:1.5 });
@@ -3778,7 +3314,6 @@ class SignalEnhancer {
         label:`🎯 目标 ${fmtP(riskWarn.takeProfit)} (+${riskWarn.takeProfitPct}%)`, dash:true, width:1.5 });
     }
 
-    // 江恩关键位水平线（带时间窗口，按距离排序取前5）
     gannLevels.slice(0, 5).forEach(l => {
       const isSupport = !l.isAbove;
       lines.push({ type:'gann', price:l.price,
@@ -3787,7 +3322,6 @@ class SignalEnhancer {
         dash:true, width:1, timeWindow:l.timeWindow, isAbove:l.isAbove });
     });
 
-    // 中枢区间带（若有效）
     const zsTop = signal.zhongshu?.top || signal.details?.priceResonance?.chanZone;
     const zsBot = signal.zhongshu?.bottom;
     if (zsTop && zsBot) {
@@ -3811,7 +3345,6 @@ class SignalEnhancer {
     };
   }
 
-  // ── 可视化HTML（完整版，含角度线简报+时间窗口表+止损目标卡）────────────
   _buildVizHTML(lines, channelNote, riskWarn, gannLevels, gannBox, gannAngles, curPrice) {
     const fmtP = v => { const _n=Number(v); if(isNaN(_n)||!isFinite(_n)||_n===0)return'--'; return _n>=1000?'$'+Math.round(_n).toLocaleString():_n>=1?'$'+_n.toFixed(2):'$'+_n.toFixed(4); };
 
@@ -3819,7 +3352,6 @@ class SignalEnhancer {
       + '<div style="font-size:.65rem;font-weight:700;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">'
       + '🎯 可视化：止损/目标 · 江恩角度线 · 时间窗口</div>';
 
-    // ── 止损/目标/盈亏比/建议仓位 四格卡 ──
     if (riskWarn) {
       const riskColor = riskWarn.riskLevel === '低' ? 'var(--bull)' : riskWarn.riskLevel === '中' ? 'var(--amber)' : 'var(--bear)';
       html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">'
@@ -4320,7 +3852,7 @@ async function engineGannChanSynergyMultiTF(gn, ch, price, coin) {
     try {
       const data = await fetchKlines(sym, tf, limit);
       if (Array.isArray(data) && data.length >= 20) klinesMap[tf] = data;
-    } catch(e) { /* 忽略单个失败 */ }
+    } catch(e) {  }
   }));
 
   // 对每个周期跑 engineGannChanSynergy
@@ -4982,17 +4514,15 @@ function renderAll(data) {
     }
   }, 200);
 
-  // Counter animation
+  // Counter animation (rAF-based, no setInterval)
   let cur = 0;
   const numEl = document.getElementById('scoreNum');
-  const iv = setInterval(() => {
-    cur = Math.min(cur + 2, score);
-    if (numEl) {
-      numEl.textContent = cur;
-      numEl.style.color = scoreColor;
-    }
-    if (cur >= score) clearInterval(iv);
-  }, 18);
+  if (numEl) { numEl.style.color = scoreColor; }
+  (function countUp() {
+    cur = Math.min(cur + 3, score);
+    if (numEl) numEl.textContent = cur;
+    if (cur < score) requestAnimationFrame(countUp);
+  })();
 
   // Hex & verdict
   const hexIdx = Math.round((avgBias+1)/2*63);
@@ -6572,13 +6102,28 @@ function renderAll(data) {
 
   const content = document.getElementById('tabContent');
   content.innerHTML = '';
+  var _panelDefs = panels; window._panelDefs = panels;
   tabDefs.forEach((t,i) => {
     const div = document.createElement('div');
     div.className = 'tab-panel' + (i===0?' active':'');
     div.id = 'tp-'+t.id;
-    if(typeof panels[t.id] === 'string') div.innerHTML = panels[t.id];
-    else if(panels[t.id]) div.appendChild(panels[t.id]);
+    if (i === 0) {
+      if(typeof _panelDefs[t.id] === 'string') div.innerHTML = _panelDefs[t.id];
+      else if(_panelDefs[t.id]) div.appendChild(_panelDefs[t.id]);
+    } else {
+      div.dataset.panelId = t.id;
+    }
     content.appendChild(div);
+  });
+  var _rIC = window.requestIdleCallback || function(cb){setTimeout(cb,16);};
+  tabDefs.slice(1).forEach(function(t) {
+    _rIC(function() {
+      var div = document.getElementById('tp-'+t.id);
+      if (div && !div.innerHTML && div.dataset.panelId) {
+        if(typeof _panelDefs[t.id] === 'string') div.innerHTML = _panelDefs[t.id];
+        else if(_panelDefs[t.id]) div.appendChild(_panelDefs[t.id]);
+      }
+    });
   });
 }
 
@@ -6670,7 +6215,14 @@ function switchDetailTab(id, btn) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   const panel = document.getElementById('tp-'+id);
-  if(panel) panel.classList.add('active');
+  if (!panel) return;
+  if (panel.dataset.panelId && !panel.innerHTML && window._panelDefs) {
+    var pd = window._panelDefs[panel.dataset.panelId];
+    if (typeof pd === 'string') panel.innerHTML = pd;
+    else if (pd) panel.appendChild(pd);
+    delete panel.dataset.panelId;
+  }
+  panel.classList.add('active');
 }
 
 // ═══════════════════════════════════════════════
@@ -6736,27 +6288,22 @@ async function smartFetch(targetUrl, opts = {}) {
   }
 
   // ── 缓存命中（30秒内复用，opts.noCache 强制跳过）─────────────────────
-  if (!opts.noCache && _priceCache[targetUrl] && Date.now() - _priceCache[targetUrl].t < 30000) {
-    console.debug('[smartFetch] ✅ 缓存命中:', targetUrl.slice(0, 80));
-    return { ok: true, json: async () => _priceCache[targetUrl].data };
+  if (!opts.noCache && _priceCache[targetUrl] && Date.now() - _priceCache[targetUrl].t < 60000) {
+      return { ok: true, json: async () => _priceCache[targetUrl].data };
   }
 
   const WORKER = 'https://binance-proxy.ravez0807.workers.dev/';
   // encodeURIComponent 将 ? & = 等字符编码，使整个 URL 成为合法的查询参数值
   const enc = encodeURIComponent(targetUrl);
 
-  console.log('[smartFetch] 开始请求:', targetUrl.slice(0, 100));
-  console.log('[smartFetch] Worker GET URL:', WORKER + '?url=' + enc.slice(0, 80) + '…');
 
   // ── 解析响应：HTML检测 + Worker错误检测 + allorigins解包 ─────────────
   const parseResp = async (r, label, unwrap = false) => {
-    console.log(`[smartFetch] [${label}] HTTP ${r.status}`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
 
     const text    = await r.text();
     const trimmed = text.trimStart();
-    console.log(`[smartFetch] [${label}] 响应前50字符:`, text.slice(0, 50));
-
+  
     if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
       throw new Error('返回了 HTML 页面（代理错误页）');
     }
@@ -6770,8 +6317,7 @@ async function smartFetch(targetUrl, opts = {}) {
 
     // allorigins 包装格式解包：{ contents: "JSON字符串", status:{...} }
     if (unwrap && data && typeof data.contents === 'string') {
-      console.log(`[smartFetch] [${label}] allorigins解包`);
-      data = JSON.parse(data.contents);
+          data = JSON.parse(data.contents);
     }
 
     // Worker 自身错误检测：{"error":"Missing url parameter"} 格式
@@ -6784,15 +6330,13 @@ async function smartFetch(targetUrl, opts = {}) {
       throw new Error('Worker错误: ' + data.error);
     }
 
-    console.log(`[smartFetch] [${label}] ✅ 成功，数据类型:`, Array.isArray(data) ? `Array(${data.length})` : 'Object');
-    _priceCache[targetUrl] = { data, t: Date.now() };
+      _priceCache[targetUrl] = { data, t: Date.now() };
     return { ok: true, json: async () => data, text: async () => text };
   };
 
   // ── 带超时的 fetch ────────────────────────────────────────────────────
   const tFetch = (url, init, ms = 20000) => {
-    console.log('[smartFetch] → fetch:', url.slice(0, 100));
-    return Promise.race([
+      return Promise.race([
       fetch(url, init),
       new Promise((_, rej) => setTimeout(() => rej(new Error('20s超时')), ms)),
     ]);
@@ -6845,8 +6389,7 @@ async function smartFetch(targetUrl, opts = {}) {
       return result;
     } catch (e) {
       lastErr = e;
-      console.warn(`[smartFetch] [${ch.label}] 失败:`, e.message);
-    }
+        }
   }
 
   console.error('[smartFetch] ❌ 所有通道均失败，最后错误:', lastErr?.message);
@@ -6980,12 +6523,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.addEventListener('DOMContentLoaded', () => {
   // UTC+8 live clock
-  function tickUTC8Clock() {
-    const el = document.getElementById('utc8ClockEl');
-    if (el) el.textContent = toUTC8TimeStr(new Date());
-  }
-  tickUTC8Clock();
-  setInterval(tickUTC8Clock, 1000);
+  // tickUTC8Clock handled by index.html clock engine
 
   // Set today's date
   document.getElementById('baseDate').value = nowUTC8DateStr();
@@ -7021,7 +6559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateSpan();
 
   // Init coin list
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
   const cyEl = document.getElementById('cycleYear');
   if (cyEl) cyEl.value = new Date().getFullYear();
   renderMonthCycle();
@@ -7547,7 +7085,17 @@ function renderCoinList() {
     renderCoinTable();
   });
 }
-function _renderCoinListNow() { /* replaced - renderCoinTable handles display */ }
+function _renderCoinListNow() {  }
+
+// ── Debounced render — prevent layout thrash from rapid successive calls
+var _renderDebTimer = null;
+function renderCoinListDebounced() {
+  if (_renderDebTimer) return;
+  _renderDebTimer = setTimeout(function() {
+    _renderDebTimer = null;
+    renderCoinListDebounced();
+  }, 80);
+}
 
 // ── renderCoinsGrid: no-op (we use list layout now) ───────────────────────
 function renderCoinsGrid() {
@@ -7929,7 +7477,7 @@ async function fetchCommodityLivePrice(coin) {
 
 async function runCommodityAnalysis(c, manualPrice) {
   dashResults[c.coin] = 'loading';
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
 
   const today    = nowUTC8DateStr();
   const sys      = getSys();
@@ -7943,13 +7491,13 @@ async function runCommodityAnalysis(c, manualPrice) {
     try {
       const live = await fetchCommodityLivePrice(c.coin);
       if (live) { price = live.price; chg24 = live.chg24; }
-    } catch(e) { /* fall through to needsPrice */ }
+    } catch(e) {  }
   }
 
   // 没有价格 → 提示手动输入
   if (!price) {
     dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, needsPrice:true };
-    renderCoinList(); renderCoinTable();
+    renderCoinListDebounced();
     return;
   }
 
@@ -8029,7 +7577,7 @@ async function runCommodityAnalysis(c, manualPrice) {
   } catch(e) {
     dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, error:e.message, score:50, avgBias:0, avgConf:.5 };
   }
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
 }
 
 // ═══════════════════════════════════════════════
@@ -8089,7 +7637,7 @@ async function runDashboard() {
   if (scanTxt) scanTxt.textContent = '正在连接 CF Worker…';
   if (typeof _wEl !== 'undefined' && _wEl) { _wEl.style.display = 'none'; _wEl.style.flex = '0'; }
   dashCoins.forEach(c => { dashResults[c.coin] = 'loading'; });
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
 
   // ── 连通性测试：用真实 ticker 验证 Worker 能返回 Binance 数据 ──────────
   let canConnect = false;
@@ -8104,12 +7652,10 @@ async function runDashboard() {
       }
       canConnect = true;
       if (scanTxt) scanTxt.textContent = `✓ 已连接 BTC=$${_testPrice.toLocaleString(undefined,{maximumFractionDigits:0})}`;
-      console.log('✓ 连接成功，BTC价格:', _testPrice);
     } else {
       throw new Error('ticker返回数据异常: ' + JSON.stringify(testData).slice(0, 80));
     }
   } catch(e) {
-    console.log('✗ 所有通道失败:', e.message);
   }
 
   if (!canConnect) {
@@ -8117,7 +7663,7 @@ async function runDashboard() {
     btn.classList.remove('loading');
     if (scanBar) scanBar.style.display = 'none';
     dashCoins.forEach(c => { dashResults[c.coin] = { coin:c.coin, label:dashCoins.find(x=>x.coin===c.coin)?.label||c.coin, color:'var(--gold)', error:'网络不可用，请点击手动输入价格' }; });
-    renderCoinList(); renderCoinTable();
+    renderCoinListDebounced();
     try { if (typeof renderCoinCards === 'function') renderCoinCards(); } catch(_e) {}
     // Network fail: show inline notice in scan bar, not welcome overlay
     const scanBarEl = document.getElementById('scanStatusBar');
@@ -8217,7 +7763,6 @@ async function runDashboard() {
           if (pd.price) {
             const priceStr = pd.price >= 1000 ? '$' + Math.round(pd.price).toLocaleString() : '$' + pd.price.toFixed(4);
             if (scanTxt) scanTxt.textContent = `✓ ${c.coin} ${priceStr} · 抓取中…`;
-            console.log(`[Dashboard] ${c.coin} 确认价格: ${priceStr}`);
           }
         } catch(e) {
           priceMap[c.coin] = { error: e.message };
@@ -8236,7 +7781,6 @@ async function runDashboard() {
       _currentMarketState = classifyMarketState(firstValidKlines);
       if (scanTxt) scanTxt.textContent =
         `市场状态：${_currentMarketState.label} · ADX=${_currentMarketState.adx} · ATR=${_currentMarketState.atrPct}%`;
-      console.log('市场状态:', _currentMarketState);
     }
 
     // Run engines sequentially per coin, yield between each for UI update
@@ -8368,8 +7912,7 @@ async function runDashboard() {
       if (Object.keys(pMap).length > 0) {
         autoVerifyHistoric(analysisDate, pMap, verifyDays)
           .then(() => { updateErrorPanel(); stratOptimizer && updateStratOptPanel(); })
-          .catch(e => console.log('autoVerify error:', e.message));
-      }
+          .catch(e =>      }
     }
 
   } finally {
@@ -8405,7 +7948,7 @@ function updateLearnStatusBar() {
   try {
     rec = window.tracker?.priceErrors?.length || 0;
     if (rec === 0) {
-      const stored = JSON.parse(localStorage.getItem('err_price') || '[]');
+      const stored = JSON.parse(_localStorage.getItem('err_price') || '[]');
       rec = stored.length;
     }
   } catch(_) {}
@@ -8481,7 +8024,7 @@ function selectCoin(coinKey) {
   }
 
   selectedCoin = coinKey;
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
 
   const c = dashCoins.find(x => x.coin === coinKey);
   const fmtP = v => v >= 1000 ? '$'+v.toLocaleString(undefined,{maximumFractionDigits:0})
@@ -8563,7 +8106,7 @@ function addCoinPrompt() {
   if (dashCoins.find(c => c.coin === sym)) { alert(`${sym} 已在列表中`); return; }
   const binanceSym = KNOWN_COINS[sym] || sym + 'USDT';
   dashCoins.push({ sym: binanceSym, coin: sym, label: sym, color: '#8888cc' });
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
   renderCoinsGrid();
 }
 function removeCoin(coinKey) {
@@ -8571,7 +8114,7 @@ function removeCoin(coinKey) {
   dashCoins = dashCoins.filter(c => c.coin !== coinKey);
   delete dashResults[coinKey];
   if (selectedCoin === coinKey) closeDetail();
-  renderCoinList(); renderCoinTable();
+  renderCoinListDebounced();
   renderCoinsGrid();
 }
 
@@ -8601,7 +8144,7 @@ function toggleTheme() {
 
 // ── PC-only: no tab switching needed ──────────────────────────
 
-function showInstallBanner() { /* no-op on PC */ }
+function showInstallBanner() {  }
 
 // ══ 斐波那契大波段计算器 ══════════════════════════════════════
 function calcFib() {
@@ -11615,14 +11158,12 @@ async function fetchPriceDirect(sym, tf = '4h', limit = 42) {
     const tick = await res.json();
     price = parseFloat(tick.lastPrice || tick.price || 0);
     chg24 = parseFloat(tick.priceChangePercent || 0);
-    console.log(`[fetchPriceDirect] ${sym} ticker OK $${price}`);
   } catch(e) {
     console.warn(`[fetchPriceDirect] ${sym} ticker失败，尝试price接口:`, e.message);
     try {
       const res = await smartFetch(priceUrl);
       const pd  = await res.json();
       price = parseFloat(pd.price || 0);
-      console.log(`[fetchPriceDirect] ${sym} price接口 OK $${price}`);
     } catch(e2) {
       throw new Error(`${sym} 价格获取失败（${e2.message}）`);
     }
@@ -11647,7 +11188,6 @@ async function fetchPriceDirect(sym, tf = '4h', limit = 42) {
       console.error(`[fetchPriceDirect] ⚠️ ${sym} 价格异常！获取到 $${price}，期望范围 $${guard.min}~$${guard.max}。代理可能返回了错误数据。`);
       throw new Error(`${guard.name} 价格异常 ($${price})：代理可能返回了错误数据，期望 $${guard.min.toLocaleString()}~$${guard.max.toLocaleString()}`);
     }
-    console.log(`[fetchPriceDirect] ✅ ${sym} 价格校验通过: $${price.toLocaleString()}`);
   }
 
   // ── Step 2: K线（失败不影响价格，用估算兜底）─────────────────────────
@@ -11659,7 +11199,6 @@ async function fetchPriceDirect(sym, tf = '4h', limit = 42) {
       klines = d;
       high = Math.max(...d.map(k => parseFloat(k[2])));
       low  = Math.min(...d.map(k => parseFloat(k[3])));
-      console.log(`[fetchPriceDirect] ${sym} klines OK ${d.length}根`);
     }
   } catch(e) {
     console.warn(`[fetchPriceDirect] ${sym} K线失败，用估算值:`, e.message);
@@ -11829,10 +11368,10 @@ async function onBaseDateChange(dateStr) {
               break;
             }
           }
-        } catch(e) { /* try next url */ }
+        } catch(e) {  }
       }
     }));
-  } catch(e) { /* network unavailable */ }
+  } catch(e) {  }
 
   // 填入主分析面板价格字段
   const activeCoin = selectedCoin || (cryptoCoins[0]?.coin);
@@ -12222,9 +11761,9 @@ function updateDashStatCards() {
   const alert = results.filter(r => Math.abs(r.avgBias||0) <= 0.15 && (r.score||0) >= 50).length;
   const opp   = results.filter(r => (r.score||0) >= 65).length;
   const g = id => document.getElementById(id);
-  if (g('statBullNum'))  g('statBullNum').innerHTML  = bull  + '<span class="unit">个</span>';
-  if (g('statBearNum'))  g('statBearNum').innerHTML  = bear  + '<span class="unit">个</span>';
-  if (g('statAlertNum')) g('statAlertNum').innerHTML = alert + '<span class="unit">个</span>';
+  if (g('statBullNum'))  g('statBullNum').textContent  = bull;
+  if (g('statBearNum'))  g('statBearNum').textContent  = bear;
+  if (g('statAlertNum')) g('statAlertNum').textContent = alert;
   if (g('statOppNum'))   g('statOppNum').innerHTML   = opp   + '<span class="unit">个</span>';
   const s = results.filter(r=>r.grade==='S').length;
   const a = results.filter(r=>r.grade==='A').length;
@@ -12509,11 +12048,11 @@ function getModelWeights() {
 class ErrorTracker {
   constructor() {
     // 最多保存10000条记录（原500条上限已取消，支持长期积累至1000条成熟）
-    this.priceErrors = JSON.parse(localStorage.getItem('err_price') || '[]');
+    this.priceErrors = JSON.parse(_localStorage.getItem('err_price') || '[]');
     this.timeErrors  = JSON.parse(localStorage.getItem('err_time')  || '[]');
-    this.weights     = JSON.parse(localStorage.getItem('err_weights') ||
+    this.weights     = JSON.parse(_localStorage.getItem('err_weights') ||
       '{"gann":0.40,"chan":0.25,"sr":0.20,"harmonic":0.15}');
-    this.modelStats  = JSON.parse(localStorage.getItem('err_stats') || '{}');
+    this.modelStats  = JSON.parse(_localStorage.getItem('err_stats') || '{}');
     // 兼容旧字段
     this.errors = [...this.priceErrors, ...this.timeErrors];
   }
@@ -12573,7 +12112,7 @@ class ErrorTracker {
     s.count++;
     s.totalErr += priceErr;
     s.dirOk    += dirCorrect;
-    localStorage.setItem('err_stats', JSON.stringify(this.modelStats));
+    _localStorage.setItem('err_stats', JSON.stringify(this.modelStats));
   }
 
   // ── 权重重校准（误差越小权重越高）──────────────────────────────────────
@@ -12596,7 +12135,7 @@ class ErrorTracker {
     // 归一化
     const total = Object.values(this.weights).reduce((s,v)=>s+v,0);
     if (total > 0) Object.keys(this.weights).forEach(m => this.weights[m] /= total);
-    if (changed) localStorage.setItem('err_weights', JSON.stringify(this.weights));
+    if (changed) _localStorage.setItem('err_weights', JSON.stringify(this.weights));
   }
 
   // ── 统计摘要 ──────────────────────────────────────────────────────────
@@ -12613,9 +12152,9 @@ class ErrorTracker {
   }
 
   save() {
-    localStorage.setItem('err_price',  JSON.stringify(this.priceErrors));
+    _localStorage.setItem('err_price',  JSON.stringify(this.priceErrors));
     localStorage.setItem('err_time',   JSON.stringify(this.timeErrors));
-    localStorage.setItem('err_weights',JSON.stringify(this.weights));
+    _localStorage.setItem('err_weights',JSON.stringify(this.weights));
     // 兼容旧 key
     localStorage.setItem('simple_weights', JSON.stringify(this.weights));
     localStorage.setItem('price_errors',   JSON.stringify(this.priceErrors.slice(-100)));
@@ -12749,7 +12288,6 @@ async function autoVerifyHistoric(date, priceMap, verifyDays = 3) {
       updateModelWeights(mktState);
 
     } catch(e) {
-      console.log('autoVerify error', coin, date, e.message);
     }
   }
 }
@@ -12757,7 +12295,7 @@ async function autoVerifyHistoric(date, priceMap, verifyDays = 3) {
 // ── 更新模型权重（按市场状态分组校准）────────────────────────────────────
 // 从 localStorage price_errors 中提取该状态下各模型的表现，重算权重
 function updateModelWeights(marketState) {
-  const allErrors = JSON.parse(localStorage.getItem('err_price') || '[]');
+  const allErrors = JSON.parse(_localStorage.getItem('err_price') || '[]');
   // 筛选该市场状态的记录
   const stateErrors = allErrors.filter(e => e.marketState === marketState);
   if (stateErrors.length < 3) return;  // 不足则不更新
@@ -12789,7 +12327,7 @@ function updateModelWeights(marketState) {
   saveWeightsByState(marketState, newWeights);
   // 同步到 tracker（全局权重用最常见状态的权重）
   tracker.weights = { ...tracker.weights, ...newWeights };
-  localStorage.setItem('err_weights', JSON.stringify(tracker.weights));
+  _localStorage.setItem('err_weights', JSON.stringify(tracker.weights));
   // 刷新面板
   updateErrorPanel();
 }
@@ -12892,7 +12430,6 @@ async function runBatchBacktest() {
 
       success++;
     } catch(e) {
-      console.log('Backtest error', dayStr, e.message);
     }
 
     done++;
@@ -12976,8 +12513,8 @@ function updateStratOptPanel() {
   // ── 读取已保存参数显示到输入框 ──────────────────────────────────────
   const stepEl = g('paramGannStep');
   const winEl  = g('paramChanWindow');
-  if (stepEl && !stepEl.dataset.dirty) stepEl.value = localStorage.getItem('gann_step') || '2';
-  if (winEl  && !winEl.dataset.dirty)  winEl.value  = localStorage.getItem('chan_fractal_window') || '1';
+  if (stepEl && !stepEl.dataset.dirty) stepEl.value = _localStorage.getItem('gann_step') || '2';
+  if (winEl  && !winEl.dataset.dirty)  winEl.value  = _localStorage.getItem('chan_fractal_window') || '1';
 
   const rec = tracker.priceErrors.length;
 
@@ -13258,9 +12795,7 @@ function toggleErrPanel() {
   }
 }
 
-/* ═══════════════════════════════════════════
-   RESPONSIVE JAVASCRIPT
-   ═══════════════════════════════════════════ */
+
 
 // ── Sidebar open/close ──────────────────────────────────────────────────────
 function toggleMobileSidebar() {
@@ -13493,7 +13028,11 @@ function onWindowResize() {
   // Re-render cards
   try { renderCoinCards(); } catch(e) {}
 }
-window.addEventListener('resize', onWindowResize);
+var _resizeDebounce = null;
+window.addEventListener('resize', function() {
+  clearTimeout(_resizeDebounce);
+  _resizeDebounce = setTimeout(onWindowResize, 150);
+}, {passive: true});
 
 // ── Swipe-to-close sidebar on mobile ────────────────────────────────────────
 (function initSwipeGesture() {
@@ -13550,7 +13089,7 @@ const ENGINE_WEIGHT_KEYS = [
 
 function loadCustomWeights() {
   try {
-    const saved = JSON.parse(localStorage.getItem('custom_engine_weights') || 'null');
+    const saved = JSON.parse(_localStorage.getItem('custom_engine_weights') || 'null');
     if (saved) return saved;
   } catch(e) {}
   const w = {};
@@ -13559,7 +13098,7 @@ function loadCustomWeights() {
 }
 
 function saveCustomWeights(w) {
-  localStorage.setItem('custom_engine_weights', JSON.stringify(w));
+  _localStorage.setItem('custom_engine_weights', JSON.stringify(w));
 }
 
 function openWeightModal() {
@@ -14231,8 +13770,8 @@ async function runOptimizer() {
 
 function applyBest() {
   if (!bestParams) return;
-  localStorage.setItem('gann_step', bestParams.gannStep);
-  localStorage.setItem('chan_fractal_window', bestParams.chanWin);
+  _localStorage.setItem('gann_step', bestParams.gannStep);
+  _localStorage.setItem('chan_fractal_window', bestParams.chanWin);
   const w = {};
   const total = bestParams.wGann + bestParams.wChan + 15 + 12 + 10 + 8 + 7 + 5 + 3 + 2;
   w.gann     = bestParams.wGann / total;
@@ -14245,7 +13784,7 @@ function applyBest() {
   w.natal     = 5  / total;
   w.ziwei     = 3  / total;
   w.volRate   = 2  / total;
-  localStorage.setItem('custom_engine_weights', JSON.stringify(w));
+  _localStorage.setItem('custom_engine_weights', JSON.stringify(w));
   alert('✅ 最优参数已保存！\\n江恩步长: ' + bestParams.gannStep +
     '\\n缠论窗口: ' + bestParams.chanWin +
     '\\n返回主页重新推演即可生效。');
@@ -15962,10 +15501,7 @@ const Lunar = (() => {
     return new Date(y, realMon - 1, realDay);
   };
 
-  /**
-   * 公历→农历
-   * @returns {year,month,day,isLeap,ganZhi,yearStem}
-   */
+  
   const fromSolar = (year, month, day) => {
     const solar = new Date(year, month - 1, day);
 
@@ -16096,11 +15632,7 @@ const QiMen = (() => {
   const SHI_UTC8 = ['23-01','01-03','03-05','05-07','07-09','09-11',
                      '11-13','13-15','15-17','17-19','19-21','21-23'];
 
-  /**
-   * 排盘主函数
-   * @param {string} dateStr YYYY-MM-DD
-   * @param {number} hour 0-23 (默认10)
-   */
+  
   const getBoard = (dateStr, hour = 10) => {
     const d    = new Date(dateStr + 'T12:00:00');
     const jq   = currentJQ(d);
@@ -16260,14 +15792,7 @@ const Ziwei = (() => {
     {name:'七杀', off:6},{name:'破军', off:10},
   ];
 
-  /**
-   * 安星主函数
-   * @param {number} lunarYear 农历年
-   * @param {number} lunarMonth 农历月
-   * @param {number} lunarDay 农历日
-   * @param {number} hour 出生时辰（0-23）
-   * @param {string} yearStem 年天干
-   */
+  
   const buildChart = (lunarYear, lunarMonth, lunarDay, hour, yearStem) => {
     const stemIdx   = STEMS.indexOf(yearStem);
     const branchIdx = ((lunarYear - 4) % 12 + 12) % 12;
@@ -16499,11 +16024,7 @@ const Meihua = (() => {
     '上爻动：物极必反，高处不胜寒',
   ];
 
-  /**
-   * 价格起卦（完全确定）
-   * @param {number} price 当前价格
-   * @param {string} date YYYY-MM-DD
-   */
+  
   const divine = (price, date) => {
     if (!price || price <= 0) return null;
     const d   = new Date((date||'2025-01-01') + 'T12:00:00');
@@ -17862,8 +17383,8 @@ class OneClickAutomator{
       const byE={};errs.forEach(e=>{(byE[e.model||'u']||(byE[e.model||'u']={c:0,t:0}));byE[e.model||'u'].t++;if(e.dirCorrect)byE[e.model||'u'].c++;});
       const nw={};let tot=0;Object.entries(byE).forEach(([k,d])=>{nw[k]=Math.max(.05,d.t>=5?d.c/d.t:.5);tot+=nw[k];});
       if(tot>0)Object.keys(nw).forEach(k=>nw[k]/=tot);
-      const cur=JSON.parse(localStorage.getItem('custom_engine_weights')||'{}');
-      localStorage.setItem('custom_engine_weights',JSON.stringify({...cur,...nw}));
+      const cur=JSON.parse(_localStorage.getItem('custom_engine_weights')||'{}');
+      _localStorage.setItem('custom_engine_weights',JSON.stringify({...cur,...nw}));
     }catch(e){}
   }
   _rpt(){
@@ -19169,7 +18690,6 @@ window.renderWesternAstrologyTab = renderWesternAstrologyTab;
   }
 })();
 
-console.log('✅ 第11引擎：西方占星就绪');
 
 'use strict';
 
@@ -19644,7 +19164,6 @@ window._fillPending = function(idx, coin, date, predPrice, origDir) {
   window.updateErrorPanel = h;
 })();
 
-console.log('✅ 节点提醒 + 导出系统就绪');
 
 'use strict';
 
@@ -19966,7 +19485,6 @@ ${tpLines.join('\n')}
   });
 }
 
-console.log('✅ 行情说明弹窗就绪');
 
 
 // ══════════════════════════════════════════════════════════════════
@@ -20521,7 +20039,6 @@ function volDesc(ta) {
 }
 
 window.openQuickAnalysis = openQuickAnalysis;
-console.log('✅ 真实技术分析引擎就绪');
 
 // ══════════════════════════════════════════════════════════
 // 学习报告弹窗
@@ -20531,12 +20048,12 @@ function openLearnReportModal() {
 
   // Gather data
   const rec    = window.tracker?.priceErrors?.length || 
-                 JSON.parse(localStorage.getItem('err_price') || '[]').length;
+                 JSON.parse(_localStorage.getItem('err_price') || '[]').length;
   const errors = window.tracker?.priceErrors || 
-                 JSON.parse(localStorage.getItem('err_price') || '[]');
-  const weights= JSON.parse(localStorage.getItem('err_weights') || 
-                            localStorage.getItem('custom_engine_weights') || '{}');
-  const stats  = JSON.parse(localStorage.getItem('err_stats') || '{}');
+                 JSON.parse(_localStorage.getItem('err_price') || '[]');
+  const weights= JSON.parse(_localStorage.getItem('err_weights') || 
+                            _localStorage.getItem('custom_engine_weights') || '{}');
+  const stats  = JSON.parse(_localStorage.getItem('err_stats') || '{}');
 
   // Tier
   const tier = rec >= 1000 ? {icon:'✅', label:'已成熟', color:'var(--bull)', bg:'var(--bull-bg)', tip:'权重已充分优化，分析可信度高'}
