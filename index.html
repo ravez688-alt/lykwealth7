@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="天機數元">
-<meta name="theme-color" content="#080c14">
+<meta name="theme-color" content="#0a0a0f">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -32,56 +32,56 @@
    深色基调 · 青色系统色 · 数据密度 · 科技质感
 ═══════════════════════════════════════════════════════ */
 :root {
-  /* 背景层级 */
-  --bg0: #050810;
-  --bg:  #080c14;
-  --bg1: #0d1220;
-  --bg2: #121828;
-  --bg3: #182030;
-  --bg4: #1e2838;
+  /* 背景层级 — 深灰碳黑，不刺眼 */
+  --bg0: #0a0a0f;
+  --bg:  #0e0e16;
+  --bg1: #13131e;
+  --bg2: #18192a;
+  --bg3: #1e2035;
+  --bg4: #242640;
 
-  /* 线条 */
-  --line:  rgba(0,212,255,.06);
-  --line2: rgba(0,212,255,.12);
-  --line3: rgba(0,212,255,.22);
+  /* 线条 — 柔和蓝紫 */
+  --line:  rgba(120,120,220,.07);
+  --line2: rgba(120,120,220,.13);
+  --line3: rgba(120,120,220,.22);
 
-  /* 品牌/强调色 — 电光青 */
-  --cyan:  #00d4ff;
-  --cyan2: #00a8cc;
-  --cyan-bg: rgba(0,212,255,.06);
-  --cyan-bd: rgba(0,212,255,.20);
-  --cyan-glow: 0 0 20px rgba(0,212,255,.25);
+  /* 品牌/强调色 — 翠绿科技感，清晰不刺眼 */
+  --cyan:  #10b981;
+  --cyan2: #059669;
+  --cyan-bg: rgba(16,185,129,.07);
+  --cyan-bd: rgba(16,185,129,.22);
+  --cyan-glow: 0 0 16px rgba(16,185,129,.20);
 
-  /* 语义色 */
-  --bull:  #00e676;
-  --bear:  #ff4757;
-  --gold:  #ffd700;
-  --amber: #ffab40;
-  --violet:#b388ff;
+  /* 语义色 — 柔和版，减少视觉疲劳 */
+  --bull:  #34d399;
+  --bear:  #f87171;
+  --gold:  #fbbf24;
+  --amber: #f59e0b;
+  --violet:#a78bfa;
 
-  --bull-bg: rgba(0,230,118,.08);
-  --bull-bd: rgba(0,230,118,.25);
-  --bear-bg: rgba(255,71,87,.08);
-  --bear-bd: rgba(255,71,87,.25);
-  --gold-bg: rgba(255,215,0,.07);
-  --gold-bd: rgba(255,215,0,.22);
+  --bull-bg: rgba(52,211,153,.07);
+  --bull-bd: rgba(52,211,153,.22);
+  --bear-bg: rgba(248,113,113,.07);
+  --bear-bd: rgba(248,113,113,.22);
+  --gold-bg: rgba(251,191,36,.07);
+  --gold-bd: rgba(251,191,36,.20);
 
-  /* 文字 */
-  --text:   #c8d8e8;
-  --bright: #e8f4ff;
-  --muted:  #5a7a9a;
-  --dim:    #3a5070;
+  /* 文字 — 暖白，舒适易读 */
+  --text:   #cbd5e1;
+  --bright: #f1f5f9;
+  --muted:  #64748b;
+  --dim:    #334155;
 
-  /* 卡片/玻璃 */
-  --card:   rgba(13,18,32,.8);
-  --card-bd:rgba(0,212,255,.10);
-  --glass:  rgba(8,12,20,.7);
+  /* 卡片 */
+  --card:   rgba(19,19,30,.85);
+  --card-bd:rgba(120,120,220,.10);
+  --glass:  rgba(10,10,15,.7);
 
   /* 阴影 */
-  --shadow: 0 2px 12px rgba(0,0,0,.5);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,.6);
-  --glow-bull: 0 0 12px rgba(0,230,118,.3);
-  --glow-bear: 0 0 12px rgba(255,71,87,.3);
+  --shadow: 0 1px 8px rgba(0,0,0,.4);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,.5);
+  --glow-bull: 0 0 10px rgba(52,211,153,.25);
+  --glow-bear: 0 0 10px rgba(248,113,113,.25);
 
   /* 字体 */
   --font: 'Space Grotesk', 'Noto Sans SC', sans-serif;
@@ -98,12 +98,15 @@
 }
 
 [data-theme="light"] {
-  --bg0: #f0f4f8; --bg: #f4f7fb; --bg1: #ffffff; --bg2: #eef2f7; --bg3: #e4eaf2; --bg4: #d8e0ec;
-  --line: rgba(0,100,180,.06); --line2: rgba(0,100,180,.12); --line3: rgba(0,100,180,.22);
-  --cyan: #0070b8; --cyan2: #005a96; --cyan-bg: rgba(0,112,184,.06); --cyan-bd: rgba(0,112,184,.20);
-  --text: #1a2a3a; --bright: #0d1a28; --muted: #5a7a9a; --dim: #8aaac8;
-  --card: rgba(255,255,255,.9); --card-bd: rgba(0,100,180,.12);
-  --bull: #00a854; --bear: #d63031;
+  --bg0: #f8fafc; --bg: #f1f5f9; --bg1: #ffffff; --bg2: #f0f4f8; --bg3: #e2e8f0; --bg4: #cbd5e1;
+  --line: rgba(30,41,59,.06); --line2: rgba(30,41,59,.11); --line3: rgba(30,41,59,.20);
+  --cyan: #059669; --cyan2: #047857;
+  --cyan-bg: rgba(5,150,105,.06); --cyan-bd: rgba(5,150,105,.20);
+  --text: #1e293b; --bright: #0f172a; --muted: #64748b; --dim: #94a3b8;
+  --card: rgba(255,255,255,.92); --card-bd: rgba(30,41,59,.10);
+  --bull: #10b981; --bear: #ef4444;
+  --bull-bg: rgba(16,185,129,.08); --bull-bd: rgba(16,185,129,.25);
+  --bear-bg: rgba(239,68,68,.08); --bear-bd: rgba(239,68,68,.25);
 }
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -123,7 +126,7 @@ body {
 body::before {
   content:'';
   position:fixed; inset:0; z-index:0; pointer-events:none;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,.015) 2px, rgba(0,212,255,.015) 3px);
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(120,120,220,.012) 2px, rgba(120,120,220,.012) 3px);
   animation: scanMove 8s linear infinite;
   will-change: transform;
 }
@@ -291,7 +294,7 @@ body::before {
 .run-btn {
   width:100%; padding:10px; border:none; border-radius:var(--radius);
   background:linear-gradient(135deg,var(--cyan2),var(--cyan));
-  color:#000; font-family:var(--font-mono); font-size:12px;
+  color:#fff; font-family:var(--font-mono); font-size:12px;
   font-weight:700; cursor:pointer; letter-spacing:1px;
   transition:opacity .15s, transform .1s;
   box-shadow:0 2px 12px rgba(0,212,255,.3);
@@ -442,7 +445,7 @@ body::before {
   flex:2; padding:7px 10px;
   background:linear-gradient(135deg,var(--cyan2),var(--cyan));
   border:none; border-radius:var(--radius);
-  color:#000; font-family:var(--font-mono); font-size:11px;
+  color:#fff; font-family:var(--font-mono); font-size:11px;
   font-weight:700; cursor:pointer; letter-spacing:.5px;
   transition:opacity .15s;
 }
@@ -1117,7 +1120,7 @@ body::before {
                   <svg width="130" height="130" viewBox="0 0 130 130">
                     <circle cx="65" cy="65" r="54" fill="none" stroke="var(--bg2)" stroke-width="8"/>
                     <circle id="scoreCircle" cx="65" cy="65" r="54" fill="none" stroke="url(#sg)" stroke-width="8" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3" transform="rotate(-90 65 65)" style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1);will-change:stroke-dashoffset"/>
-                    <defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="var(--cyan2)"/><stop offset="100%" stop-color="var(--cyan)"/></linearGradient></defs>
+                    <defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="var(--cyan2)"/><stop offset="100%" stop-color="var(--bull)"/></linearGradient></defs>
                   </svg>
                   <div class="score-center">
                     <div class="score-num" id="scoreNum">--</div>
@@ -1545,38 +1548,23 @@ body::before {
 // xuanxue.js 在文件85%处才设置 window.oneClick
 // 用户可能在此之前点击按钮，所以用轮询重试代替 alert
 window._safeRunAll = function() {
-  var btn = document.getElementById('oneClickBtnInline') || document.getElementById('oneClickBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ 初始化中...'; }
-
-  var maxWait = 8000; // 最多等8秒
-  var interval = 100;
-  var waited = 0;
-
-  function tryRun() {
-    if (window.oneClick && typeof window.oneClick.runAll === 'function') {
-      // 恢复按钮状态
-      if (btn) { btn.disabled = false; }
-      var mEl = document.getElementById('autoMode');
-      if (mEl) mEl.value = (document.getElementById('autoModeInline') || {}).value || 'quick';
-      window.oneClick.runAll();
-      return;
-    }
-    // 备用：直接点击隐藏按钮
-    var rb = document.getElementById('runAllBtn');
-    if (rb && typeof runDashboard === 'function') {
-      if (btn) { btn.disabled = false; }
-      rb.click();
-      return;
-    }
-    waited += interval;
-    if (waited >= maxWait) {
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 全自动推演'; }
-      alert('系统加载超时，请刷新页面重试');
-      return;
-    }
-    setTimeout(tryRun, interval);
+  // 直接调用 runDashboard，不依赖 oneClick 包装器
+  if (typeof runDashboard === 'function') {
+    runDashboard();
+    return;
   }
-  tryRun();
+  // 备用：通过 oneClick
+  if (window.oneClick && typeof window.oneClick.runAll === 'function') {
+    window.oneClick.runAll();
+    return;
+  }
+  // 兜底：延迟重试一次
+  setTimeout(function() {
+    if (typeof runDashboard === 'function') { runDashboard(); return; }
+    if (window.oneClick) { window.oneClick.runAll(); return; }
+    var rb = document.getElementById('runAllBtn');
+    if (rb) { rb.click(); }
+  }, 500);
 };
 
 // ── 模块折叠 ──
