@@ -7912,7 +7912,8 @@ async function runDashboard() {
       if (Object.keys(pMap).length > 0) {
         autoVerifyHistoric(analysisDate, pMap, verifyDays)
           .then(() => { updateErrorPanel(); stratOptimizer && updateStratOptPanel(); })
-          .catch(e =>      }
+          .catch(() => {});
+      }
     }
 
   } finally {
