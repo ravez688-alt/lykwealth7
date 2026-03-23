@@ -7,6 +7,16 @@
 })();
 
 
+// Suppress network error noise in console (Worker offline is expected)
+window.addEventListener('unhandledrejection', function(e) {
+  var msg = e.reason && (e.reason.message || String(e.reason));
+  if (msg && (msg.includes('所有通道') || msg.includes('Failed to fetch') ||
+      msg.includes('NetworkError') || msg.includes('AbortError') ||
+      msg.includes('HTTP 500') || msg.includes('HTTP 4'))) {
+    e.preventDefault();
+  }
+});
+
 
 (function() {
   try {
@@ -46,27 +56,14 @@
   };
 })();
 const _KV = (() => {
-  const WORKER = 'https://binance-proxy.ravez0807.workers.dev';
-  const SYNC_KEYS = ['custom_engine_weights','err_price','err_time','err_weights','err_stats','simple_weights','price_errors','time_errors'];
+  // Worker已停用 — 纯本地localStorage实现，零网络请求
   let _cache = {};
 
   async function get(key, fallback) {
     if (_cache[key] !== undefined) return _cache[key];
     try {
-      const r = await fetch(`${WORKER}/kv?key=${encodeURIComponent(key)}`);
-      if (r.ok) {
-        const d = await r.json();
-        if (d.value !== null && d.value !== undefined) {
-          _cache[key] = d.value;
-          try { localStorage.setItem(key, d.value); } catch(_) {}
-          return d.value;
-        }
-      }
-    } catch(e) {
-    }
-    try {
       const local = localStorage.getItem(key);
-      if (local !== null) return local;
+      if (local !== null) { _cache[key] = local; return local; }
     } catch(_) {}
     return fallback !== undefined ? fallback : null;
   }
@@ -75,33 +72,9 @@ const _KV = (() => {
     const str = typeof value === 'string' ? value : JSON.stringify(value);
     _cache[key] = str;
     try { localStorage.setItem(key, str); } catch(_) {}
-    fetch(`${WORKER}/kv`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, value: str })
-    }).catch(() => {});
   }
 
-  async function syncAll() {
-    try {
-      const r = await fetch(`${WORKER}/kv/all`);
-      if (!r.ok) return;
-      const data = await r.json();
-      for (const [k, v] of Object.entries(data)) {
-        if (v !== null && SYNC_KEYS.includes(k)) {
-          _cache[k] = v;
-          try { localStorage.setItem(k, v); } catch(_) {}
-        }
-      }
-    } catch(e) {
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(syncAll, 2000));
-  } else {
-    setTimeout(syncAll, 2000);
-  }
+  async function syncAll() {} // no-op
 
   return { get, set, syncAll };
 })();
@@ -6278,122 +6251,60 @@ const CORS_PROXIES = [
 ];
 
 async function smartFetch(targetUrl, opts = {}) {
-  // targetUrl：完整的原始 Binance API URL
-  // 例：https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=4h&limit=42
-
-  // ── 入口校验：必须是完整 URL ──────────────────────────────────────────
   if (!targetUrl || !targetUrl.startsWith('http')) {
-    console.error('[smartFetch] ❌ 无效 URL（必须以 http 开头）:', targetUrl);
     throw new Error('无效 URL: ' + targetUrl);
   }
 
-  // ── 缓存命中（30秒内复用，opts.noCache 强制跳过）─────────────────────
+  // Cache hit
   if (!opts.noCache && _priceCache[targetUrl] && Date.now() - _priceCache[targetUrl].t < 60000) {
-      return { ok: true, json: async () => _priceCache[targetUrl].data };
+    return { ok: true, json: async () => _priceCache[targetUrl].data };
   }
 
-  const WORKER = 'https://binance-proxy.ravez0807.workers.dev/';
-  // encodeURIComponent 将 ? & = 等字符编码，使整个 URL 成为合法的查询参数值
   const enc = encodeURIComponent(targetUrl);
 
-
-  // ── 解析响应：HTML检测 + Worker错误检测 + allorigins解包 ─────────────
-  const parseResp = async (r, label, unwrap = false) => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-
-    const text    = await r.text();
+  const parseResp = async (r, unwrap) => {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
     const trimmed = text.trimStart();
-  
-    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-      throw new Error('返回了 HTML 页面（代理错误页）');
-    }
-
+    if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) throw new Error('HTML response');
     let data;
-    try {
-      data = JSON.parse(text);
-    } catch (e) {
-      throw new Error('JSON 解析失败: ' + text.slice(0, 60));
+    try { data = JSON.parse(text); } catch(e) { throw new Error('JSON parse fail'); }
+    if (unwrap && data && typeof data.contents === 'string') data = JSON.parse(data.contents);
+    if (!Array.isArray(data) && data && typeof data.error === 'string'
+        && Object.keys(data).length <= 2 && !data.symbol && !data.lastPrice && !data.price) {
+      throw new Error('API error: ' + data.error);
     }
-
-    // allorigins 包装格式解包：{ contents: "JSON字符串", status:{...} }
-    if (unwrap && data && typeof data.contents === 'string') {
-          data = JSON.parse(data.contents);
-    }
-
-    // Worker 自身错误检测：{"error":"Missing url parameter"} 格式
-    // 条件：纯对象、≤2字段、error 是字符串、不含 Binance 正常字段
-    if (!Array.isArray(data) && data
-        && typeof data.error === 'string'
-        && Object.keys(data).length <= 2
-        && !data.symbol && !data.lastPrice && !data.price) {
-      console.error(`[smartFetch] [${label}] Worker业务错误:`, data.error);
-      throw new Error('Worker错误: ' + data.error);
-    }
-
-      _priceCache[targetUrl] = { data, t: Date.now() };
+    _priceCache[targetUrl] = { data, t: Date.now() };
     return { ok: true, json: async () => data, text: async () => text };
   };
 
-  // ── 带超时的 fetch ────────────────────────────────────────────────────
-  const tFetch = (url, init, ms = 20000) => {
-      return Promise.race([
-      fetch(url, init),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('20s超时')), ms)),
-    ]);
+  const tFetch = (url, opts2) => {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 7000);
+    return fetch(url, { ...(opts2||{}), signal: ctrl.signal })
+      .finally(() => clearTimeout(tid));
   };
 
-  // ── 通道列表（顺序 = 优先级）─────────────────────────────────────────
   const channels = [
-    {
-      // 通道1：Worker GET，?url=编码后的完整URL
-      label: 'Worker·GET',
-      run: () => tFetch(WORKER + '?url=' + enc)
-                   .then(r => parseResp(r, 'Worker·GET', false)),
-    },
-    {
-      // 通道2：Worker POST，url 放 body（绕过 query string 被中间层截断的问题）
-      label: 'Worker·POST',
-      run: () => tFetch(WORKER, {
-                   method:  'POST',
-                   headers: { 'Content-Type': 'application/json' },
-                   body:    JSON.stringify({ url: targetUrl }),
-                 }).then(r => parseResp(r, 'Worker·POST', false)),
-    },
-    {
-      // 通道3：corsproxy.io，直接前缀拼接
-      label: 'corsproxy.io',
-      run: () => tFetch('https://corsproxy.io/?' + enc)
-                   .then(r => parseResp(r, 'corsproxy.io', false)),
-    },
-    {
-      // 通道4：allorigins，返回包装JSON需解包
-      label: 'allorigins',
-      run: () => tFetch('https://api.allorigins.win/get?url=' + enc)
-                   .then(r => parseResp(r, 'allorigins', true)),
-    },
-    {
-      // 通道5：cors.lol，?url= 格式
-      label: 'cors.lol',
-      run: () => tFetch('https://api.cors.lol/?url=' + enc)
-                   .then(r => parseResp(r, 'cors.lol', false)),
-    },
+    // 通道1: 直接请求 Binance（国内可能失败，但其他地区最快）
+    { run: () => tFetch(targetUrl).then(r => parseResp(r, false)) },
+    // 通道2: corsproxy.io
+    { run: () => tFetch('https://corsproxy.io/?' + enc).then(r => parseResp(r, false)) },
+    // 通道3: allorigins
+    { run: () => tFetch('https://api.allorigins.win/get?url=' + enc).then(r => parseResp(r, true)) },
+    // 通道4: cors.lol
+    { run: () => tFetch('https://api.cors.lol/?url=' + enc).then(r => parseResp(r, false)) },
   ];
 
   let lastErr = null;
   for (const ch of channels) {
     try {
-      const result = await ch.run();
-      if (!ch.label.startsWith('Worker')) {
-        console.info('[smartFetch] Worker不可用，降级至:', ch.label);
-      }
-      return result;
-    } catch (e) {
+      return await ch.run();
+    } catch(e) {
       lastErr = e;
-        }
+    }
   }
-
-  console.error('[smartFetch] ❌ 所有通道均失败，最后错误:', lastErr?.message);
-  throw new Error('所有通道均失败（最后: ' + (lastErr?.message || '未知') + '）');
+  throw new Error('所有通道均失败: ' + (lastErr?.message || '未知'));
 }
 
 function binanceUrl(path) { return BINANCE_RAW + path; }
@@ -7589,13 +7500,12 @@ async function runNetDiag() {
   box.style.display = 'block';
   box.textContent = '🔍 诊断中，请稍候…\n';
 
-  const WORKER  = 'https://binance-proxy.ravez0807.workers.dev/';
   const TEST_URL = 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT';
   const enc      = encodeURIComponent(TEST_URL);
 
   const tests = [
-    { label: '① Worker GET ?url=',  url: WORKER + '?url=' + enc,                         init: {} },
-    { label: '② Worker POST body',  url: WORKER,                                           init: { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url:TEST_URL}) } },
+    { label: '① Binance Direct',    url: TEST_URL,                                         init: {} },
+    { label: '② corsproxy.io',      url: 'https://corsproxy.io/?' + enc,                   init: { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url:TEST_URL}) } },
     { label: '③ corsproxy.io',        url: 'https://corsproxy.io/?' + enc,                  init: {} },
     { label: '④ allorigins /get',     url: 'https://api.allorigins.win/get?url=' + enc,     init: {} },
     { label: '⑤ 直连 Binance',        url: TEST_URL,                                        init: {} },
@@ -13433,7 +13343,7 @@ if (typeof _origSelectCoin === 'function') {
 // 功能4：实时监控面板（monitor.html 生成器）
 // ═══════════════════════════════════════════════════════════
 function openMonitorPage() {
-  const WORKER = 'https://binance-proxy.ravez0807.workers.dev/';
+  const WORKER = ''; // Worker offline
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
