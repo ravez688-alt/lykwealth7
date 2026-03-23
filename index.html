@@ -1548,23 +1548,31 @@ body::before {
 // xuanxue.js 在文件85%处才设置 window.oneClick
 // 用户可能在此之前点击按钮，所以用轮询重试代替 alert
 window._safeRunAll = function() {
-  // 直接调用 runDashboard，不依赖 oneClick 包装器
-  if (typeof runDashboard === 'function') {
-    runDashboard();
-    return;
+  // 轮询等待 runDashboard 就绪（xuanxue.js 异步解析中）
+  var attempts = 0;
+  var maxAttempts = 50; // 最多等5秒 (50×100ms)
+  function tryRun() {
+    // 优先直接调用 runDashboard
+    if (typeof runDashboard === 'function') {
+      runDashboard();
+      return;
+    }
+    // 备用：oneClick 包装器
+    if (window.oneClick && typeof window.oneClick.runAll === 'function') {
+      window.oneClick.runAll();
+      return;
+    }
+    // 继续等待
+    attempts++;
+    if (attempts < maxAttempts) {
+      setTimeout(tryRun, 100);
+    } else {
+      // 最后兜底：直接触发隐藏按钮
+      var rb = document.getElementById('runAllBtn');
+      if (rb) { rb.click(); }
+    }
   }
-  // 备用：通过 oneClick
-  if (window.oneClick && typeof window.oneClick.runAll === 'function') {
-    window.oneClick.runAll();
-    return;
-  }
-  // 兜底：延迟重试一次
-  setTimeout(function() {
-    if (typeof runDashboard === 'function') { runDashboard(); return; }
-    if (window.oneClick) { window.oneClick.runAll(); return; }
-    var rb = document.getElementById('runAllBtn');
-    if (rb) { rb.click(); }
-  }, 500);
+  tryRun();
 };
 
 // ── 模块折叠 ──
