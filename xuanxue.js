@@ -54,7 +54,8 @@ window.addEventListener('unhandledrejection', function(e) {
     if (n >= 0.01)  return '$' + window._safeFixed(n, 4);
     return '$' + window._safeFixed(n, 6);
   };
-})();const _KV = (() => {
+})();
+const _KV = (() => {
   // Worker已停用 — 纯本地localStorage实现，零网络请求
   let _cache = {};
 
@@ -7975,6 +7976,12 @@ function selectCoin(coinKey) {
 
   // Render full analysis into results div
   try {
+    // 设置 window.S 供量化引擎读取
+    const _c = dashCoins.find(x => x.coin === coinKey);
+    window.S = window.S || {};
+    window.S.sym = (_c && _c.sym) ? _c.sym : (coinKey + 'USDT');
+    window.S.coin = coinKey;
+
     renderAll({
       coin:res.coin, date:res.date, price:res.price, high:res.high, low:res.low,
       span:res.span, sys:res.sys,
@@ -7982,6 +7989,8 @@ function selectCoin(coinKey) {
       ch:res.ch, nt:res.nt, zw:res.zw, va:res.va,
       rsiE:res.rsiE, macdE:res.macdE, bbE:res.bbE, tdE:res.tdE, tfRec:res.tfRec, mtfE:res.mtfE,
       tpsl:res.tpsl, tpsl5:res.tpsl5, nodes:res.nodes, breakLevel:res.breakLvl, gt:res.gt,
+      klines: res.klines || null,          // ← 传入 K线数据供量化引擎分析
+      allKlines: res.allKlines || null,    // ← 多周期 K线
       _priceWarning: res._priceWarning || null,   // 价格异常警告
     });
   } catch(renderErr) {
@@ -8540,11 +8549,28 @@ function runDirect() {
       };
       _lastStratData = renderData;
 
+      // 设置 window.S 供量化引擎读取
+      window.S = window.S || {};
+      window.S.sym  = rawCoin + 'USDT';
+      window.S.coin = rawCoin;
+
       // 滚到顶
       const detBody = document.getElementById('detailBody') || document.getElementById('dbDetail');
       if (detBody) detBody.scrollTop = 0;
 
       renderAll(renderData);
+
+      // 异步拉取 K线供量化引擎分析右侧面板（不阻塞主渲染）
+      (function fetchKlinesForDirect() {
+        const sym = rawCoin + 'USDT';
+        const tf  = (document.getElementById('fetchPeriod') || {}).value || '4h';
+        const klUrl = `https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${tf}&limit=200`;
+        fetch(klUrl).then(function(r){ return r.json(); }).then(function(kl) {
+          if (!Array.isArray(kl) || kl.length < 30) return;
+          // 再次调用 renderAll（带 klines），触发量化引擎
+          renderAll(Object.assign({}, renderData, { klines: kl }));
+        }).catch(function(){});
+      })();
 
     } catch(e) {
       if (loadEl) loadEl.classList.remove('on');
