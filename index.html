@@ -90,6 +90,15 @@
   --radius-lg: 10px;
   --radius-xl: 16px;
 
+  /* xuanxue_quant.js 使用的颜色别名 */
+  --green:    #34d399;
+  --red:      #f87171;
+  --green-bd: rgba(52,211,153,.22);
+  --red-bd:   rgba(248,113,113,.22);
+  --gold3:    #d97706;
+  --indigo:   #818cf8;
+  --faint:    #475569;
+
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeSpeed;
@@ -105,6 +114,9 @@
   --bull: #10b981; --bear: #ef4444;
   --bull-bg: rgba(16,185,129,.08); --bull-bd: rgba(16,185,129,.25);
   --bear-bg: rgba(239,68,68,.08); --bear-bd: rgba(239,68,68,.25);
+  --green:    #10b981; --red: #ef4444;
+  --green-bd: rgba(16,185,129,.25); --red-bd: rgba(239,68,68,.25);
+  --faint:    #64748b; --indigo: #6366f1;
 }
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -1552,7 +1564,26 @@ window._safeRunAll = function() {
   function tryRun() {
     // 优先直接调用 runDashboard
     if (typeof runDashboard === 'function') {
-      runDashboard();
+      var p = runDashboard();
+      // 推演完成后自动选中评分最高的币种，触发中间+右侧面板填充
+      if (p && typeof p.then === 'function') {
+        p.then(function() {
+          setTimeout(function() {
+            if (!window.dashResults || !window.dashCoins) return;
+            var best = null, bestScore = -1;
+            window.dashCoins.forEach(function(c) {
+              var r = window.dashResults[c.coin];
+              if (r && r !== 'loading' && !r.error && !r.needsPrice && r.score > bestScore) {
+                bestScore = r.score;
+                best = c.coin;
+              }
+            });
+            if (best && typeof window.selectCoin === 'function') {
+              window.selectCoin(best);
+            }
+          }, 400);
+        }).catch(function(){});
+      }
       return;
     }
     // 备用：oneClick 包装器
@@ -1718,6 +1749,99 @@ window._onQEResult = function(res) {
     window.QE.fetchFundingRate(sym).then(function(fm){renderFundingPanel(fm,sym);}).catch(function(){});
   }
 };
+
+// ══════════════════════════════════════════════════════════════
+// 桥接补丁：修复中间区域价格头部 + 右侧面板数据联动
+// 核心问题：selectCoin 调用 renderAll 时没传 klines，
+// 导致 xuanxue_quant.js 的 patch 无法触发量化引擎
+// ══════════════════════════════════════════════════════════════
+(function installBridge() {
+  // 等待 xuanxue.js 完全加载后再 patch
+  var attempts = 0;
+  function tryPatch() {
+    if (typeof selectCoin !== 'function' || typeof runDashboard !== 'function') {
+      if (++attempts < 60) { setTimeout(tryPatch, 200); return; }
+      return;
+    }
+
+    // ── Patch 1: selectCoin — 更新中间价格头部 ──
+    var _origSelectCoin = window.selectCoin;
+    window.selectCoin = function(coinKey) {
+      _origSelectCoin && _origSelectCoin(coinKey);
+      var res = window.dashResults && window.dashResults[coinKey];
+      if (!res || res === 'loading' || res.error || res.needsPrice) return;
+
+      // 更新中间区域价格头部（原来只在 detail 内更新，不更新 priceHeader）
+      var fmtP = function(v) {
+        if (!v || isNaN(v)) return '--';
+        v = Number(v);
+        if (v >= 10000) return '$' + Math.round(v).toLocaleString();
+        if (v >= 1)     return '$' + v.toFixed(2);
+        return '$' + v.toFixed(4);
+      };
+      var phSym = document.getElementById('phSym');
+      if (phSym) phSym.textContent = coinKey;
+      var phSymLabel = document.getElementById('phSymLabel');
+      if (phSymLabel) { phSymLabel.textContent = res.verdictTitle || coinKey; phSymLabel.style.display = ''; }
+      var priceBig = document.getElementById('priceBig');
+      if (priceBig) priceBig.textContent = fmtP(res.price);
+      var priceChg = document.getElementById('priceChg');
+      if (priceChg) {
+        var chg = Number(res.chg24) || 0;
+        priceChg.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%';
+        priceChg.style.color = chg >= 0 ? 'var(--bull)' : 'var(--bear)';
+      }
+      var hiEl = document.getElementById('st-hi'); if (hiEl) hiEl.textContent = fmtP(res.high);
+      var loEl = document.getElementById('st-lo'); if (loEl) loEl.textContent = fmtP(res.low);
+
+      // 设置 window.S 供量化引擎读取（选币时同步）
+      var c = window.dashCoins && window.dashCoins.find(function(x){ return x.coin === coinKey; });
+      window.S = window.S || {};
+      window.S.sym  = (c && c.sym) ? c.sym : (coinKey + 'USDT');
+      window.S.coin = coinKey;
+    };
+
+    // ── Patch 2: runDashboard 完成后自动更新右侧面板 ──
+    // 通过拦截 renderCoinListDebounced（每次结果更新都会调用）实现
+    var _origRCLD = window.renderCoinListDebounced;
+    var _lastAutoUpdate = 0;
+    window.renderCoinListDebounced = function() {
+      _origRCLD && _origRCLD.apply(this, arguments);
+      // 同步更新左侧面板（显示评分进度条）
+      var prices = window._ibPrices || {};
+      var changes = {};
+      if (window.dashResults) {
+        Object.keys(window.dashResults).forEach(function(k) {
+          var r = window.dashResults[k];
+          if (r && r !== 'loading' && r.chg24) changes[(window.dashCoins||[]).find(function(c){return c.coin===k;})||{sym:k+'USDT'}] = r.chg24;
+        });
+      }
+      renderSeedList(prices, null);
+
+      // 节流：每2s最多触发一次右侧面板自动更新
+      var now = Date.now();
+      if (now - _lastAutoUpdate < 2000) return;
+      _lastAutoUpdate = now;
+
+      // 如果当前已选中某个币且有 klines，触发右侧面板刷新
+      var selCoin = window.selectedCoin;
+      if (!selCoin) return;
+      var res2 = window.dashResults && window.dashResults[selCoin];
+      if (!res2 || res2 === 'loading' || !res2.klines) return;
+
+      // 保证 window.S 已设置
+      if (!window.S || window.S.coin !== selCoin) {
+        var c2 = window.dashCoins && window.dashCoins.find(function(x){ return x.coin === selCoin; });
+        window.S = window.S || {};
+        window.S.sym  = (c2 && c2.sym) ? c2.sym : (selCoin + 'USDT');
+        window.S.coin = selCoin;
+      }
+    };
+
+    console.log('[Bridge] 已安装：中间价格头部 + 右侧面板联动补丁');
+  }
+  setTimeout(tryPatch, 300);
+})();
 
 // ── 时框切换 ──
 function setStratTF(tf, btn) {
