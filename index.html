@@ -26,60 +26,59 @@
 
 <style>
 /* ═══════════════════════════════════════════════════════
-   天機數元 v3 — CYBER TERMINAL 设计语言
-   深色基调 · 青色系统色 · 数据密度 · 科技质感
+   天機數元 v3 — 舒适深色主题（深蓝灰，护眼低对比）
 ═══════════════════════════════════════════════════════ */
 :root {
-  /* 背景层级 — 深灰碳黑，不刺眼 */
-  --bg0: #0a0a0f;
-  --bg:  #0e0e16;
-  --bg1: #13131e;
-  --bg2: #18192a;
-  --bg3: #1e2035;
-  --bg4: #242640;
+  /* 背景层级 — 深蓝灰，不刺眼 */
+  --bg0: #0f1117;
+  --bg:  #141720;
+  --bg1: #1a1e2e;
+  --bg2: #212536;
+  --bg3: #272c3f;
+  --bg4: #2e3449;
 
   /* 线条 — 柔和蓝紫 */
-  --line:  rgba(120,120,220,.07);
-  --line2: rgba(120,120,220,.13);
-  --line3: rgba(120,120,220,.22);
+  --line:  rgba(100,120,200,.08);
+  --line2: rgba(100,120,200,.14);
+  --line3: rgba(100,120,200,.24);
 
-  /* 品牌/强调色 — 翠绿科技感，清晰不刺眼 */
+  /* 品牌/强调色 — 翠绿科技感 */
   --cyan:  #10b981;
   --cyan2: #059669;
-  --cyan-bg: rgba(16,185,129,.07);
-  --cyan-bd: rgba(16,185,129,.22);
-  --cyan-glow: 0 0 16px rgba(16,185,129,.20);
+  --cyan-bg: rgba(16,185,129,.08);
+  --cyan-bd: rgba(16,185,129,.25);
+  --cyan-glow: 0 0 16px rgba(16,185,129,.18);
 
-  /* 语义色 — 柔和版，减少视觉疲劳 */
-  --bull:  #34d399;
+  /* 语义色 */
+  --bull:  #4ade80;
   --bear:  #f87171;
   --gold:  #fbbf24;
   --amber: #f59e0b;
   --violet:#a78bfa;
 
-  --bull-bg: rgba(52,211,153,.07);
-  --bull-bd: rgba(52,211,153,.22);
+  --bull-bg: rgba(74,222,128,.07);
+  --bull-bd: rgba(74,222,128,.22);
   --bear-bg: rgba(248,113,113,.07);
   --bear-bd: rgba(248,113,113,.22);
   --gold-bg: rgba(251,191,36,.07);
   --gold-bd: rgba(251,191,36,.20);
 
   /* 文字 — 暖白，舒适易读 */
-  --text:   #cbd5e1;
-  --bright: #f1f5f9;
-  --muted:  #64748b;
-  --dim:    #334155;
+  --text:   #b8c4d4;
+  --bright: #dde6f0;
+  --muted:  #5a6a82;
+  --dim:    #364055;
 
   /* 卡片 */
-  --card:   rgba(19,19,30,.85);
-  --card-bd:rgba(120,120,220,.10);
-  --glass:  rgba(10,10,15,.7);
+  --card:   rgba(26,30,46,.90);
+  --card-bd:rgba(100,120,200,.12);
+  --glass:  rgba(15,17,23,.75);
 
   /* 阴影 */
-  --shadow: 0 1px 8px rgba(0,0,0,.4);
-  --shadow-lg: 0 4px 24px rgba(0,0,0,.5);
-  --glow-bull: 0 0 10px rgba(52,211,153,.25);
-  --glow-bear: 0 0 10px rgba(248,113,113,.25);
+  --shadow: 0 1px 8px rgba(0,0,0,.5);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,.6);
+  --glow-bull: 0 0 10px rgba(74,222,128,.22);
+  --glow-bear: 0 0 10px rgba(248,113,113,.22);
 
   /* 字体 */
   --font: 'Space Grotesk', 'Noto Sans SC', sans-serif;
@@ -91,13 +90,13 @@
   --radius-xl: 16px;
 
   /* xuanxue_quant.js 使用的颜色别名 */
-  --green:    #34d399;
+  --green:    #4ade80;
   --red:      #f87171;
-  --green-bd: rgba(52,211,153,.22);
+  --green-bd: rgba(74,222,128,.22);
   --red-bd:   rgba(248,113,113,.22);
   --gold3:    #d97706;
   --indigo:   #818cf8;
-  --faint:    #475569;
+  --faint:    #4a5568;
 
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -132,15 +131,8 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ── 扫描线背景纹理 ── */
-body::before {
-  content:'';
-  position:fixed; inset:0; z-index:0; pointer-events:none;
-  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(120,120,220,.012) 2px, rgba(120,120,220,.012) 3px);
-  animation: scanMove 8s linear infinite;
-  will-change: transform;
-}
-@keyframes scanMove { from{background-position:0 0} to{background-position:0 60px} }
+/* ── 扫描线背景纹理（已禁用，减少视觉干扰） ── */
+body::before { display:none; }
 
 ::-webkit-scrollbar { width:4px; height:4px; }
 ::-webkit-scrollbar-track { background:transparent; }
@@ -252,7 +244,9 @@ body::before {
 }
 .panel-head-dot {
   width:6px; height:6px; border-radius:50%;
-  background:var(--cyan); animation:blink 2s infinite;
+  background:var(--cyan);
+  /* 降低闪烁频率，减少干扰 */
+  animation:blink 4s infinite;
   box-shadow:var(--cyan-glow);
 }
 
@@ -1938,8 +1932,8 @@ function renderSeedList(prices, changes) {
       +(score>0?'<div class="sym-score-bar"><div class="sym-score-fill" style="width:'+score+'%;background:'+(score>=65?'var(--bull)':score>=45?'var(--amber)':'var(--bear)')+'"></div></div>':'')
       +'</div>'
       +'<div class="sym-right">'
-      +'<div class="sym-price">'+fmtPrice(px)+'</div>'
-      +(chgStr?'<div class="sym-chg" style="color:'+chgColor+'">'+chgStr+'</div>':'<div class="sym-chg" style="color:var(--dim)">'+( isLoading?'···':'--')+'</div>')
+      +'<div class="sym-price" id="sp-'+c.coin+'">'+fmtPrice(px)+'</div>'
+      +(chgStr?'<div class="sym-chg" id="sc-'+c.coin+'" style="color:'+chgColor+'">'+chgStr+'</div>':'<div class="sym-chg" id="sc-'+c.coin+'" style="color:var(--dim)">'+( isLoading?'···':'--')+'</div>')
       +'</div>'
       +'</div>';
   });
@@ -1951,6 +1945,19 @@ function renderSeedList(prices, changes) {
 
 // 立刻渲染种子价格（页面打开0ms延迟）
 renderSeedList(null, null);
+
+// 等 xuanxue.js 加载完后用完整 dashCoins 刷新列表
+(function waitForDashCoins() {
+  var tries = 0;
+  function check() {
+    if (window.dashCoins && window.dashCoins.length >= 6) {
+      renderSeedList(window._ibPrices || null, null);
+      return;
+    }
+    if (++tries < 40) setTimeout(check, 150);
+  }
+  setTimeout(check, 200);
+})();
 
 // ── 实时行情引擎 ──
 (function(){
@@ -1965,8 +1972,20 @@ renderSeedList(null, null);
     var dir=prev?(px>prev?1:px<prev?-1:0):0;
     // Update topbar ticker items
     var pEl=document.getElementById('tt-'+sym), cEl=document.getElementById('tc-'+sym);
-    if(pEl){flash('tt-'+sym,dir);pEl.textContent=fp(px);pEl.className='tick-px '+(chg>=0?'pos':'neg');}
+    if(pEl){flash('tt-'+sym,dir);pEl.textContent=fp(px);pEl.className='tick-px '+(chg>=0?'pos':'neg');}\
     if(cEl){cEl.textContent=fc(chg);cEl.className='tick-chg '+(chg>=0?'pos':'neg');}
+    // 直接原地更新左侧列表价格（避免 innerHTML 重建导致闪烁）
+    var coin=sym.replace('USDT','');
+    var priceEl=document.getElementById('sp-'+coin);
+    var chgEl=document.getElementById('sc-'+coin);
+    if(priceEl){
+      priceEl.textContent=fp(px);
+      if(dir!==0){priceEl.style.color=dir>0?'var(--bull)':'var(--bear)';setTimeout(function(){priceEl.style.color='';},600);}
+    }
+    if(chgEl){
+      chgEl.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';
+      chgEl.style.color=chg>=0?'var(--bull)':'var(--bear)';
+    }
     // Update price header if this is the selected coin
     if(window.S&&window.S.sym===sym) {
       var pb=document.getElementById('priceBig');
@@ -1980,8 +1999,8 @@ renderSeedList(null, null);
     window._ibPrices[sym]=px;
     // Update seed prices
     SEED_PRICES[sym]=px;
-    // Refresh left panel
-    renderSeedList(prices, changes);
+    // 仅在列表尚未渲染时重建（首次加载）
+    if(!document.getElementById('sp-BTC')){renderSeedList(prices, changes);}
   }
 
   window._ibGetPrice=function(sym){return window._ibPrices&&window._ibPrices[sym]||SEED_PRICES[sym]||0;};
