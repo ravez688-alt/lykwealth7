@@ -7330,6 +7330,133 @@ function applyManualPrice(coinKey) {
   runCommodityAnalysis(c, val);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 大宗商品真实 K 线 — Yahoo Finance（GC=F黄金/SI=F白银）
+// 经由 smartFetch 多通道代理，自动降级
+// 返回格式与 Binance klines 一致：
+//   [openTime, open, high, low, close, volume, closeTime, ...]
+// ════════════════════════════════════════════════════════════════════
+async function fetchCommodityKlines(coin, tf = '4h') {
+  // Yahoo Finance ticker 映射
+  const YAHOO_TICKER = {
+    XAU: 'GC%3DF',    // 黄金期货 Gold Continuous Contract
+    XAG: 'SI%3DF',    // 白银期货 Silver Continuous Contract
+    WTI: 'CL%3DF',    // 原油期货 WTI Crude Continuous
+    SPX: '%5EGSPC',   // 标普500
+    HSI: '%5EHSI',    // 恒生指数
+    TSMC:'TSM',       // 台积电
+  };
+
+  const ticker = YAHOO_TICKER[coin];
+  if (!ticker) return null;
+
+  // 将内部 TF 映射到 Yahoo Finance 的 interval / range
+  const TF_YAHOO = {
+    '15m': { interval:'15m', range:'5d'   },
+    '30m': { interval:'30m', range:'10d'  },
+    '1h':  { interval:'1h',  range:'30d'  },
+    '2h':  { interval:'1h',  range:'30d'  },  // Yahoo 无 2h，降级用 1h
+    '4h':  { interval:'1h',  range:'60d'  },  // Yahoo 无 4h，用 1h 拉60天再聚合
+    '8h':  { interval:'1d',  range:'6mo'  },  // 降级日线
+    '1d':  { interval:'1d',  range:'1y'   },
+    '3d':  { interval:'1d',  range:'2y'   },  // 降级日线
+    '1w':  { interval:'1wk', range:'5y'   },
+  };
+
+  const yf = TF_YAHOO[tf] || TF_YAHOO['4h'];
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=${yf.interval}&range=${yf.range}`;
+
+  let raw = null;
+  // 尝试多个代理通道
+  const proxies = [
+    url,                                                             // 直连（部分地区可用）
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
+  ];
+
+  for (const proxyUrl of proxies) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(proxyUrl, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!res.ok) continue;
+      const text = await res.text();
+      const trimmed = text.trimStart();
+      if (trimmed.startsWith('<')) continue;  // HTML error page
+      const data = JSON.parse(text);
+      // allorigins /raw 直接是 Yahoo JSON；/get 包一层
+      raw = data?.contents ? JSON.parse(data.contents) : data;
+      if (raw?.chart?.result?.[0]?.timestamp?.length >= 10) break;
+      raw = null;
+    } catch(_) { /* try next proxy */ }
+  }
+
+  if (!raw) return null;
+
+  const result  = raw.chart.result[0];
+  const tsList  = result.timestamp || [];
+  const quote   = result.indicators?.quote?.[0] || {};
+  const opens   = quote.open   || [];
+  const highs   = quote.high   || [];
+  const lows    = quote.low    || [];
+  const closes  = quote.close  || [];
+  const volumes = quote.volume || [];
+
+  if (tsList.length < 10) return null;
+
+  // 构建 Binance 格式 klines（过滤 null/NaN 的缺口数据）
+  const intervalMs = {
+    '15m':15*60000,'30m':30*60000,'1h':3600000,
+    '1d':86400000,'1wk':7*86400000,
+  }[yf.interval] || 3600000;
+
+  const klines = [];
+  for (let i = 0; i < tsList.length; i++) {
+    const o = opens[i], h = highs[i], l = lows[i], c = closes[i], v = volumes[i];
+    if (o == null || h == null || l == null || c == null) continue;
+    if (isNaN(o) || isNaN(c)) continue;
+    const openTime  = tsList[i] * 1000;
+    const closeTime = openTime + intervalMs - 1;
+    // Binance kline format: [openTime,open,high,low,close,volume,closeTime,quoteVol,trades,...]
+    klines.push([openTime, o, h, l, c, v||0, closeTime, (v||0)*c, 100, (v||0)*0.5, 0, 0]);
+  }
+
+  if (klines.length < 10) return null;
+
+  // 若 Yahoo 无 4h 原生，把 1h 聚合成 4h
+  if (tf === '4h' && yf.interval === '1h') {
+    return aggregateKlines(klines, 4);
+  }
+  if (tf === '2h' && yf.interval === '1h') {
+    return aggregateKlines(klines, 2);
+  }
+  if (tf === '3d' && yf.interval === '1d') {
+    return aggregateKlines(klines, 3);
+  }
+
+  return klines;
+}
+
+// 将 N 根 K 线聚合为 1 根（用于 1h→4h 等）
+function aggregateKlines(klines, n) {
+  const result = [];
+  for (let i = 0; i < klines.length; i += n) {
+    const group = klines.slice(i, i + n);
+    if (group.length < Math.ceil(n / 2)) continue;  // 不足半组跳过
+    const openTime  = group[0][0];
+    const closeTime = group[group.length - 1][6];
+    const open      = group[0][1];
+    const high      = Math.max(...group.map(k => k[2]));
+    const low       = Math.min(...group.map(k => k[3]));
+    const close     = group[group.length - 1][4];
+    const volume    = group.reduce((s, k) => s + k[5], 0);
+    result.push([openTime, open, high, low, close, volume, closeTime, volume*close, 100, volume*0.5, 0, 0]);
+  }
+  return result.length >= 10 ? result : null;
+}
+
 // 大宗商品实时价格：XAU/XAG → gold-api.com（免费无key，CORS开放）
 //                  WTI      → EIA API（已配置key）
 const EIA_API_KEY = 'TqlgqKbmbuZQIMMfxqZcJbgL8jaSuQ53SlGGENro';
@@ -7416,6 +7543,13 @@ async function runCommodityAnalysis(c, manualPrice) {
   const high = price * 1.10;
   const low  = price * 0.90;
 
+  // 拉取真实 K 线（XAU→GC=F，XAG→SI=F，via Yahoo Finance + smartFetch 代理）
+  let klines = null;
+  try {
+    const tf = (document.getElementById('fetchPeriod') || {}).value || '4h';
+    klines = await fetchCommodityKlines(c.coin, tf);
+  } catch(_) { /* K线获取失败不影响主流程，量化引擎将跳过技术分析 */ }
+
   try {
     const qm = sys.qimen   ? engineQiMen(c.coin, today)                          : null;
     const ic = sys.iching  ? engineIChing(c.coin, today)                          : null;
@@ -7484,6 +7618,7 @@ async function runCommodityAnalysis(c, manualPrice) {
       tpsl: engineTPSL(c.coin, today, price, high, low, {sr,gn,ch,hr,nt}),
       tpsl5: engineTPSL5(c.coin, today, price, high, low, {sr,gn,ch,hr}),
       nodes, date: today, span,
+      klines: klines || null,   // K线数据（有则供量化引擎使用）
     };
   } catch(e) {
     dashResults[c.coin] = { coin:c.coin, label:c.label, color:c.color, error:e.message, score:50, avgBias:0, avgConf:.5 };
