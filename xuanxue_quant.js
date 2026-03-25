@@ -787,7 +787,7 @@ function patchXuanxue() {
     try {
       if (!data) return;
       let kl = data.klines || data.kl || (data.allKlines && data.allKlines['4h']);
-      if (!kl || kl.length < 30) return;
+      if (!kl || kl.length < 10) return;
 
       let klMap = null;
       if (data.allKlines) klMap = data.allKlines;
