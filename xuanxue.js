@@ -11193,6 +11193,7 @@ window.addEventListener('error', function(e) {
     btn.disabled = false;
   }
   // Show error in welcome area
+  const welcome = document.querySelector('.welcome');
     if (welcome && !welcome.classList.contains('hidden')) {
     const errDiv = document.getElementById('_errNotice') || document.createElement('div');
     errDiv.id = '_errNotice';
