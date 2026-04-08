@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://fonts.googleapis.com https://fonts.gstatic.com https://api.binance.com https://api1.binance.com https://fapi.binance.com https://stream.binance.com https://api.alternative.me https://api.coingecko.com https://api.llama.fi https://api.blockchain.info https://corsproxy.io https://api.allorigins.win wss://stream.binance.com wss://data-stream.binance.vision; connect-src 'self' https: wss: data: blob:;;">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="天機數元">
-<meta name="theme-color" content="#0a0a0f">
+<meta name="theme-color" content="#1a1612">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
@@ -19,66 +19,73 @@
 
 <script>
 (function(){
-  try{var t=localStorage.getItem('xxtheme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(_){}
-  if(window.top!==window.self){try{window.top.location.href=window.location.href;}catch(e){document.body.innerHTML='<p style="color:#00d4ff;text-align:center;margin-top:20vh">⚠ 请直接访问</p>';}return;}
+  // 暖色主题为默认，不再沿用旧的深蓝缓存
+  try{
+    var t=localStorage.getItem('xxtheme');
+    // 只接受 'light'（奶油亮色），其余一律用暖深色
+    if(t==='light') document.documentElement.setAttribute('data-theme','light');
+    // 清除旧的深蓝主题缓存
+    else localStorage.removeItem('xxtheme');
+  }catch(_){}
+  if(window.top!==window.self){try{window.top.location.href=window.location.href;}catch(e){document.body.innerHTML='<p style="color:#e8a045;text-align:center;margin-top:20vh">⚠ 请直接访问</p>';}return;}
 })();
 </script>
 
 <style>
 /* ═══════════════════════════════════════════════════════
-   天機數元 v3 — 舒适深色主题（深蓝灰，护眼低对比）
+   天機數元 v3 — 暖色主题（米棕沙漠，护眼舒适）
 ═══════════════════════════════════════════════════════ */
 :root {
-  /* 背景层级 — 深蓝灰，不刺眼 */
-  --bg0: #0f1117;
-  --bg:  #141720;
-  --bg1: #1a1e2e;
-  --bg2: #212536;
-  --bg3: #272c3f;
-  --bg4: #2e3449;
+  /* 背景层级 — 暖米棕，舒适不刺眼 */
+  --bg0: #1a1612;
+  --bg:  #1f1b16;
+  --bg1: #272119;
+  --bg2: #2e271e;
+  --bg3: #362e23;
+  --bg4: #3e3428;
 
-  /* 线条 — 柔和蓝紫 */
-  --line:  rgba(100,120,200,.08);
-  --line2: rgba(100,120,200,.14);
-  --line3: rgba(100,120,200,.24);
+  /* 线条 — 柔和暖棕 */
+  --line:  rgba(200,170,120,.08);
+  --line2: rgba(200,170,120,.14);
+  --line3: rgba(200,170,120,.26);
 
-  /* 品牌/强调色 — 翠绿科技感 */
-  --cyan:  #10b981;
-  --cyan2: #059669;
-  --cyan-bg: rgba(16,185,129,.08);
-  --cyan-bd: rgba(16,185,129,.25);
-  --cyan-glow: 0 0 16px rgba(16,185,129,.18);
+  /* 品牌/强调色 — 琥珀金橙 */
+  --cyan:  #e8a045;
+  --cyan2: #c8832a;
+  --cyan-bg: rgba(232,160,69,.09);
+  --cyan-bd: rgba(232,160,69,.28);
+  --cyan-glow: 0 0 16px rgba(232,160,69,.20);
 
   /* 语义色 */
-  --bull:  #4ade80;
-  --bear:  #f87171;
-  --gold:  #fbbf24;
-  --amber: #f59e0b;
-  --violet:#a78bfa;
+  --bull:  #5ecb8a;
+  --bear:  #f0756a;
+  --gold:  #f5c842;
+  --amber: #e8a045;
+  --violet:#b89cf7;
 
-  --bull-bg: rgba(74,222,128,.07);
-  --bull-bd: rgba(74,222,128,.22);
-  --bear-bg: rgba(248,113,113,.07);
-  --bear-bd: rgba(248,113,113,.22);
-  --gold-bg: rgba(251,191,36,.07);
-  --gold-bd: rgba(251,191,36,.20);
+  --bull-bg: rgba(94,203,138,.07);
+  --bull-bd: rgba(94,203,138,.22);
+  --bear-bg: rgba(240,117,106,.07);
+  --bear-bd: rgba(240,117,106,.22);
+  --gold-bg: rgba(245,200,66,.07);
+  --gold-bd: rgba(245,200,66,.22);
 
-  /* 文字 — 暖白，舒适易读 */
-  --text:   #b8c4d4;
-  --bright: #dde6f0;
-  --muted:  #5a6a82;
-  --dim:    #364055;
+  /* 文字 — 暖米白，舒适易读 */
+  --text:   #c8bba8;
+  --bright: #e8ddd0;
+  --muted:  #7a6a55;
+  --dim:    #4a3e30;
 
   /* 卡片 */
-  --card:   rgba(26,30,46,.90);
-  --card-bd:rgba(100,120,200,.12);
-  --glass:  rgba(15,17,23,.75);
+  --card:   rgba(39,33,25,.92);
+  --card-bd:rgba(200,170,120,.12);
+  --glass:  rgba(26,22,18,.78);
 
   /* 阴影 */
   --shadow: 0 1px 8px rgba(0,0,0,.5);
-  --shadow-lg: 0 4px 24px rgba(0,0,0,.6);
-  --glow-bull: 0 0 10px rgba(74,222,128,.22);
-  --glow-bear: 0 0 10px rgba(248,113,113,.22);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,.55);
+  --glow-bull: 0 0 10px rgba(94,203,138,.22);
+  --glow-bear: 0 0 10px rgba(240,117,106,.22);
 
   /* 字体 */
   --font: 'Space Grotesk', 'Noto Sans SC', sans-serif;
@@ -90,32 +97,33 @@
   --radius-xl: 16px;
 
   /* xuanxue_quant.js 使用的颜色别名 */
-  --green:    #4ade80;
-  --red:      #f87171;
-  --green-bd: rgba(74,222,128,.22);
-  --red-bd:   rgba(248,113,113,.22);
-  --gold3:    #d97706;
-  --indigo:   #818cf8;
-  --faint:    #4a5568;
+  --green:    #5ecb8a;
+  --red:      #f0756a;
+  --green-bd: rgba(94,203,138,.22);
+  --red-bd:   rgba(240,117,106,.22);
+  --gold3:    #c8832a;
+  --indigo:   #9d8cf5;
+  --faint:    #5a4a38;
 
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeSpeed;
 }
 
+/* 亮色暖调：奶油米白 */
 [data-theme="light"] {
-  --bg0: #f8fafc; --bg: #f1f5f9; --bg1: #ffffff; --bg2: #f0f4f8; --bg3: #e2e8f0; --bg4: #cbd5e1;
-  --line: rgba(30,41,59,.06); --line2: rgba(30,41,59,.11); --line3: rgba(30,41,59,.20);
-  --cyan: #059669; --cyan2: #047857;
-  --cyan-bg: rgba(5,150,105,.06); --cyan-bd: rgba(5,150,105,.20);
-  --text: #1e293b; --bright: #0f172a; --muted: #64748b; --dim: #94a3b8;
-  --card: rgba(255,255,255,.92); --card-bd: rgba(30,41,59,.10);
-  --bull: #10b981; --bear: #ef4444;
-  --bull-bg: rgba(16,185,129,.08); --bull-bd: rgba(16,185,129,.25);
-  --bear-bg: rgba(239,68,68,.08); --bear-bd: rgba(239,68,68,.25);
-  --green:    #10b981; --red: #ef4444;
-  --green-bd: rgba(16,185,129,.25); --red-bd: rgba(239,68,68,.25);
-  --faint:    #64748b; --indigo: #6366f1;
+  --bg0: #fdf8f2; --bg: #f8f2e8; --bg1: #ffffff; --bg2: #f5ede0; --bg3: #ece0d0; --bg4: #dfd0bc;
+  --line: rgba(120,80,30,.06); --line2: rgba(120,80,30,.11); --line3: rgba(120,80,30,.20);
+  --cyan: #c8732a; --cyan2: #a85e1e;
+  --cyan-bg: rgba(200,115,42,.07); --cyan-bd: rgba(200,115,42,.22);
+  --text: #3d2e1e; --bright: #1e1208; --muted: #7a6050; --dim: #b0a090;
+  --card: rgba(255,252,245,.94); --card-bd: rgba(120,80,30,.10);
+  --bull: #2a9e60; --bear: #d94040;
+  --bull-bg: rgba(42,158,96,.08); --bull-bd: rgba(42,158,96,.25);
+  --bear-bg: rgba(217,64,64,.08); --bear-bd: rgba(217,64,64,.25);
+  --green:    #2a9e60; --red: #d94040;
+  --green-bd: rgba(42,158,96,.25); --red-bd: rgba(217,64,64,.25);
+  --faint:    #907060; --indigo: #6654c8;
 }
 
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -245,8 +253,6 @@ body::before { display:none; }
 .panel-head-dot {
   width:6px; height:6px; border-radius:50%;
   background:var(--cyan);
-  /* 降低闪烁频率，减少干扰 */
-  animation:blink 4s infinite;
   box-shadow:var(--cyan-glow);
 }
 
@@ -1616,8 +1622,8 @@ function toggleTheme() {
   document.documentElement.setAttribute('data-theme',next);
   var btn = document.getElementById('themeBtn');
   if (btn) btn.textContent = next==='light'?'◑':'☀';
-  try { localStorage.setItem('xxtheme',next); } catch(_){}
-  try { document.querySelector('meta[name="theme-color"]').content=next==='light'?'#f4f7fb':'#080c14'; } catch(_){}
+  try { localStorage.setItem('xxtheme',next==='light'?'light':''); } catch(_){}
+  try { document.querySelector('meta[name="theme-color"]').content=next==='light'?'#fdf8f2':'#1a1612'; } catch(_){}
 }
 (function(){
   var th=document.documentElement.getAttribute('data-theme')||'dark';
@@ -1925,8 +1931,7 @@ function renderSeedList(prices, changes) {
     var isActive = window.selectedCoin === c.coin;
     var canClick = window.dashResults&&window.dashResults[c.coin]&&window.dashResults[c.coin]!=='loading'&&!window.dashResults[c.coin].error;
 
-    html += '<div class="sym-item'+(isActive?' active':'')+'" '
-      +(canClick?'onclick="selectCoin(\''+c.coin+'\')"':isLoading?'':'onclick="selectCoin(\''+c.coin+'\')"')+'>'
+    html += '<div class="sym-item'+(isActive?' active':'')+'" onclick="selectCoin(\''+c.coin+'\')" style="cursor:pointer">'
       +'<div><div class="sym-coin" style="color:'+(c.color||'var(--cyan)')+'">'+c.coin+'</div>'
       +'<div class="sym-name">'+( c.label||c.name||c.coin)+'</div>'
       +(score>0?'<div class="sym-score-bar"><div class="sym-score-fill" style="width:'+score+'%;background:'+(score>=65?'var(--bull)':score>=45?'var(--amber)':'var(--bear)')+'"></div></div>':'')
@@ -1999,8 +2004,9 @@ renderSeedList(null, null);
     window._ibPrices[sym]=px;
     // Update seed prices
     SEED_PRICES[sym]=px;
-    // 仅在列表尚未渲染时重建（首次加载）
-    if(!document.getElementById('sp-BTC')){renderSeedList(prices, changes);}
+    // 仅在列表完全未渲染时才重建（首次加载），之后原地更新已由上方代码完成
+    var symListEl = document.getElementById('symList');
+    if(symListEl && !symListEl.querySelector('.sym-item')){renderSeedList(prices, changes);}
   }
 
   window._ibGetPrice=function(sym){return window._ibPrices&&window._ibPrices[sym]||SEED_PRICES[sym]||0;};
