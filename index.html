@@ -1972,7 +1972,7 @@ renderSeedList(null, null);
     var dir=prev?(px>prev?1:px<prev?-1:0):0;
     // Update topbar ticker items
     var pEl=document.getElementById('tt-'+sym), cEl=document.getElementById('tc-'+sym);
-    if(pEl){flash('tt-'+sym,dir);pEl.textContent=fp(px);pEl.className='tick-px '+(chg>=0?'pos':'neg');}\
+    if(pEl){flash('tt-'+sym,dir);pEl.textContent=fp(px);pEl.className='tick-px '+(chg>=0?'pos':'neg');}
     if(cEl){cEl.textContent=fc(chg);cEl.className='tick-chg '+(chg>=0?'pos':'neg');}
     // 直接原地更新左侧列表价格（避免 innerHTML 重建导致闪烁）
     var coin=sym.replace('USDT','');
