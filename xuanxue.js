@@ -11194,7 +11194,7 @@ window.addEventListener('error', function(e) {
   }
   // Show error in welcome area
   const welcome = document.querySelector('.welcome');
-    if (welcome && !welcome.classList.contains('hidden')) {
+  if (welcome && !welcome.classList.contains('hidden')) {
     const errDiv = document.getElementById('_errNotice') || document.createElement('div');
     errDiv.id = '_errNotice';
     errDiv.style.cssText = 'margin:12px;padding:10px 14px;background:rgba(184,40,40,.1);border:1px solid rgba(184,40,40,.3);border-radius:8px;font-size:.72rem;color:#b82828;line-height:1.7';
